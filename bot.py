@@ -520,7 +520,16 @@ async def list_accounts_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed_guard(update):
         return
 
-    await accounts(update, context)
+    rows = list_accounts(100, 0)
+    if not rows:
+        await update.effective_message.reply_text("<b>📭 No accounts found</b>", parse_mode=ParseMode.HTML)
+        return
+
+    lines = ["<b>📋 Accounts</b>", ""]
+    for row in rows:
+        lines.append(f"• <b>ID:</b> <code>{row['id']}</code>  |  <b>User:</b> <code>{esc(row['username'])}</code>  |  <b>Category:</b> <code>{esc(row['category'])}</code>")
+
+    await update.effective_message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
 
 
 async def bulkdelete(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -672,21 +681,40 @@ async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not user_header or not password_header:
             raise ValueError("Could not find the required columns")
 
+        extracted_rows = []
         out = io.StringIO(newline="")
         writer = csv.writer(out)
         writer.writerow(["User ID / Email Address", "Password"])
         for row in reader:
-            writer.writerow([row.get(user_header, ""), row.get(password_header, "")])
+            username = (row.get(user_header, "") or "").strip()
+            password = (row.get(password_header, "") or "").strip()
+            if username and password:
+                extracted_rows.append((username, password))
+            writer.writerow([username, password])
+
+        category_id = get_category_id_by_name("uncategorized")
+        if category_id is None:
+            ok, _message = add_category("uncategorized")
+            if not ok:
+                raise RuntimeError("Could not create uncategorized category")
+            category_id = get_category_id_by_name("uncategorized")
+
+        summary = add_accounts_bulk(extracted_rows, category_id)
 
         bio = io.BytesIO(out.getvalue().encode("utf-8"))
         bio.name = "extracted_accounts.csv"
         bio.seek(0)
         await update.effective_message.reply_document(
             document=InputFile(bio, filename=bio.name),
-            caption="<b>📄 Extracted CSV</b>\nUser/Email + Password only.",
+            caption=(
+                "<b>📄 Extracted CSV</b>\n"
+                f"User/Email + Password only.\n"
+                f"Stored: <code>{summary['added']}</code> new account(s), "
+                f"skipped duplicates: <code>{summary['skipped']}</code>."
+            ),
             parse_mode=ParseMode.HTML,
         )
-        logger.info("CSV extracted for user %s", update.effective_user.id)
+        logger.info("CSV extracted for user %s: added=%s skipped=%s", update.effective_user.id, summary['added'], summary['skipped'])
     except Exception as exc:
         logger.warning("CSV extraction failed for user %s: %s", update.effective_user.id, exc)
         await update.effective_message.reply_text(
