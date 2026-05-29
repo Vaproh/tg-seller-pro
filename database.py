@@ -7,7 +7,7 @@ from typing import Iterable
 
 from config import SERVICE_NAME
 
-DB = f"{SERVICE_NAME.lower().replace(' ', '_')}_vault.db"
+DB = f"data/{SERVICE_NAME.lower().replace(' ', '_')}_vault.db"
 
 
 def connect() -> sqlite3.Connection:
