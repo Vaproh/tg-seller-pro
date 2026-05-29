@@ -127,7 +127,8 @@ def fmt_account_block(index: int, username: str, password: str, category: str | 
 
 
 PENDING_PAGE_SIZE = 5
-ACCOUNTS_PAGE_SIZE = 8
+ACCOUNTS_PAGE_SIZE = 5
+LIST_PAGE_SIZE = 5
 
 
 def build_pending_page(page: int) -> tuple[str, InlineKeyboardMarkup]:
@@ -220,6 +221,44 @@ def build_accounts_page(page: int) -> tuple[str, InlineKeyboardMarkup]:
     return "\n\n".join(text), InlineKeyboardMarkup(keyboard)
 
 
+def build_list_page(page: int) -> tuple[str, InlineKeyboardMarkup]:
+    total = count_accounts()
+    offset = page * LIST_PAGE_SIZE
+    rows = list_accounts(LIST_PAGE_SIZE, offset)
+
+    if not rows:
+        return (
+            "<b>📋 Accounts</b>\n\n<em>No accounts found.</em>",
+            InlineKeyboardMarkup([]),
+        )
+
+    text = [
+        f"<b>📋 Accounts</b>  <code>page {page + 1}/{max(1, (total + LIST_PAGE_SIZE - 1) // LIST_PAGE_SIZE)}</code>"
+    ]
+    keyboard = []
+
+    for row in rows:
+        text.append(
+            "• <b>ID:</b> <code>{id}</code>  |  "
+            "<b>User:</b> <code>{username}</code>  |  "
+            "<b>Category:</b> <code>{category}</code>".format(
+                id=row['id'],
+                username=esc(row['username']),
+                category=esc(row['category']),
+            )
+        )
+
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"listpage:{page - 1}"))
+    if offset + len(rows) < total:
+        nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"listpage:{page + 1}"))
+    if nav_buttons:
+        keyboard.append(nav_buttons)
+
+    return "\n".join(text), InlineKeyboardMarkup(keyboard)
+
+
 async def set_commands(app: Application) -> None:
     commands = [
         BotCommand("start", "🤖 Show bot menu"),
@@ -235,7 +274,7 @@ async def set_commands(app: Application) -> None:
         BotCommand("logs", "📜 View retrieval logs"),
         BotCommand("unused", "⏳ Pending retrieval items menu"),
         BotCommand("accounts", "👥 Manage account used status"),
-        BotCommand("list", "📋 List accounts"),
+        BotCommand("list", "📋 Browse accounts by page"),
         BotCommand("bulkdelete", "🗑️ Bulk delete accounts"),
         BotCommand("setstatus", "🧭 Set account used/unused by ID"),
         BotCommand("extractcsv", "📄 Extract User/Email + Password from CSV"),
@@ -259,24 +298,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         f"<b>🤖 {esc(BOT_NAME)}</b>\n"
         f"<i>🔐 Private vault for {esc(SERVICE_NAME)} credentials</i>\n\n"
-        f"<b>Commands</b>\n"
-        f"• /add - ➕ add one account\n"
-        f"• /bulkadd - 📥 add many accounts\n"
-        f"• /getaccounts - 📂 retrieve accounts\n"
-        f"• /search - 🔎 search accounts\n"
-        f"• /delete - 🗑️ delete by ID\n"
-        f"• /categories - 🗂️ list categories\n"
-        f"• /addcategory - 🆕 create category\n"
-        f"• /deletecategory - ❌ delete category\n"
-        f"• /logs - 📜 recent retrieval logs\n"
-        f"• /unused - ⏳ pending retrieval items menu\n"
-        f"• /accounts - 👥 manage account used status\n"
-        f"• /list - 📋 list accounts\n"
-        f"• /bulkdelete - 🗑️ bulk delete by IDs or category\n"
-        f"• /setstatus used|unused 1 2 - 🧭 toggle account state by ID\n"
-        f"• /extractcsv - 📄 upload a CSV and extract User/Email + Password\n"
-        f"• /stats - 📊 statistics\n"
-        f"• /export - 💾 export CSV"
+        f"<b>✨ Quick commands</b>\n"
+        f"• /add — ➕ save one account\n"
+        f"• /bulkadd — 📥 import multiple accounts\n"
+        f"• /getaccounts — 📂 pull unused accounts\n"
+        f"• /search — 🔎 find an account quickly\n"
+        f"• /delete — 🗑️ remove an account by ID\n"
+        f"• /categories — 🗂️ view all categories\n"
+        f"• /addcategory — 🆕 create a category\n"
+        f"• /deletecategory — ❌ remove a category\n"
+        f"• /logs — 📜 recent retrieval activity\n"
+        f"• /unused — ⏳ review pending retrieval items\n"
+        f"• /accounts — 👥 manage used/unused status\n"
+        f"• /list — 📋 browse accounts page by page\n"
+        f"• /bulkdelete — 🗑️ delete by IDs or category\n"
+        f"• /setstatus used|unused 1 2 — 🧭 update account status\n"
+        f"• /extractcsv — 📄 extract email/user + password from CSV\n"
+        f"• /stats — 📊 see bot usage stats\n"
+        f"• /export — 💾 export the full account list"
     )
     await update.effective_message.reply_text(text, parse_mode=ParseMode.HTML)
 
@@ -520,16 +559,12 @@ async def list_accounts_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed_guard(update):
         return
 
-    rows = list_accounts(100, 0)
-    if not rows:
-        await update.effective_message.reply_text("<b>📭 No accounts found</b>", parse_mode=ParseMode.HTML)
-        return
-
-    lines = ["<b>📋 Accounts</b>", ""]
-    for row in rows:
-        lines.append(f"• <b>ID:</b> <code>{row['id']}</code>  |  <b>User:</b> <code>{esc(row['username'])}</code>  |  <b>Category:</b> <code>{esc(row['category'])}</code>")
-
-    await update.effective_message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
+    text, reply_markup = build_list_page(0)
+    await update.effective_message.reply_text(
+        text,
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+    )
 
 
 async def bulkdelete(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -983,6 +1018,17 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
         await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
         return
 
+    if query.data.startswith("listpage:"):
+        try:
+            page = int(query.data.split(":", 1)[1])
+        except ValueError:
+            await query.answer("Invalid page.")
+            return
+
+        text, reply_markup = build_list_page(page)
+        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        return
+
     if query.data.startswith("accounttoggle:"):
         parts = query.data.split(":")
         if len(parts) < 3:
@@ -1160,7 +1206,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("export", export))
 
     app.add_handler(CallbackQueryHandler(handle_category_callback, pattern=r"^(addcat|bulkcat|getcat):"))
-    app.add_handler(CallbackQueryHandler(handle_session_callback, pattern=r"^(sess|pending|itemused|itemunused|accountpage|accounttoggle):"))
+    app.add_handler(CallbackQueryHandler(handle_session_callback, pattern=r"^(sess|pending|itemused|itemunused|accountpage|accounttoggle|listpage):"))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_csv_upload))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_error_handler(error_handler)
