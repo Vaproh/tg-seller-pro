@@ -3,11 +3,15 @@ from __future__ import annotations
 import csv
 import io
 import sqlite3
+from pathlib import Path
 from typing import Iterable
 
 from config import SERVICE_NAME
 
-DB = f"data/{SERVICE_NAME.lower().replace(' ', '_')}_vault.db"
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+DB = str(DATA_DIR / f"{SERVICE_NAME.lower().replace(' ', '_')}_vault.db")
 
 
 def connect() -> sqlite3.Connection:
@@ -37,6 +41,8 @@ def init_db() -> None:
             username TEXT NOT NULL,
             password TEXT NOT NULL,
             category_id INTEGER NOT NULL,
+            used INTEGER NOT NULL DEFAULT 0,
+            used_at TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE RESTRICT
         )
@@ -49,6 +55,12 @@ def init_db() -> None:
         ON accounts(username, password, category_id)
         """
     )
+
+    existing_columns = [row[1] for row in conn.execute("PRAGMA table_info(accounts)").fetchall()]
+    if "used" not in existing_columns:
+        cur.execute("ALTER TABLE accounts ADD COLUMN used INTEGER NOT NULL DEFAULT 0")
+    if "used_at" not in existing_columns:
+        cur.execute("ALTER TABLE accounts ADD COLUMN used_at TEXT")
 
     cur.execute(
         """
@@ -291,6 +303,38 @@ def get_accounts_for_category(category_id: int, limit: int) -> list[sqlite3.Row]
     return rows
 
 
+def get_unused_accounts_for_category(category_id: int, limit: int) -> list[sqlite3.Row]:
+    conn = connect()
+    rows = conn.execute(
+        """
+        SELECT a.id, a.username, a.password, c.name AS category, a.created_at
+        FROM accounts a
+        JOIN categories c ON c.id = a.category_id
+        WHERE a.category_id = ? AND a.used = 0
+        ORDER BY a.id ASC
+        LIMIT ?
+        """,
+        (category_id, limit),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def set_account_used(account_id: int, used: bool) -> bool:
+    conn = connect()
+    cur = conn.execute(
+        """
+        UPDATE accounts
+        SET used = ?, used_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END
+        WHERE id = ?
+        """,
+        (1 if used else 0, 1 if used else 0, account_id),
+    )
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
+
+
 def count_accounts_for_category(category_id: int) -> int:
     conn = connect()
     row = conn.execute(
@@ -305,7 +349,7 @@ def get_account_by_id(account_id: int) -> sqlite3.Row | None:
     conn = connect()
     row = conn.execute(
         """
-        SELECT a.id, a.username, a.password, c.name AS category, a.created_at
+        SELECT a.id, a.username, a.password, c.name AS category, a.created_at, a.used, a.used_at
         FROM accounts a
         JOIN categories c ON c.id = a.category_id
         WHERE a.id = ?
@@ -314,6 +358,36 @@ def get_account_by_id(account_id: int) -> sqlite3.Row | None:
     ).fetchone()
     conn.close()
     return row
+
+
+def count_pending_items() -> int:
+    conn = connect()
+    row = conn.execute("SELECT COUNT(*) AS count FROM retrieval_items WHERE used = 0").fetchone()
+    conn.close()
+    return int(row["count"]) if row else 0
+
+
+def list_accounts(limit: int = 20, offset: int = 0) -> list[sqlite3.Row]:
+    conn = connect()
+    rows = conn.execute(
+        """
+        SELECT a.id, a.username, a.password, c.name AS category, a.created_at, a.used, a.used_at
+        FROM accounts a
+        JOIN categories c ON c.id = a.category_id
+        ORDER BY a.id ASC
+        LIMIT ? OFFSET ?
+        """,
+        (limit, offset),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def count_accounts() -> int:
+    conn = connect()
+    row = conn.execute("SELECT COUNT(*) AS count FROM accounts").fetchone()
+    conn.close()
+    return int(row["count"]) if row else 0
 
 
 def create_retrieval_session(user_id: int, category_id: int, requested_amount: int, retrieved_amount: int) -> int:
@@ -427,7 +501,7 @@ def set_item_used(item_id: int, used: bool) -> bool:
     return cur.rowcount > 0
 
 
-def list_pending_items(limit: int = 25) -> list[sqlite3.Row]:
+def list_pending_items(limit: int = 25, offset: int = 0) -> list[sqlite3.Row]:
     conn = connect()
     rows = conn.execute(
         """
@@ -441,8 +515,9 @@ def list_pending_items(limit: int = 25) -> list[sqlite3.Row]:
         WHERE i.used = 0
         ORDER BY i.id DESC
         LIMIT ?
+        OFFSET ?
         """,
-        (limit,),
+        (limit, offset),
     ).fetchall()
     conn.close()
     return rows
