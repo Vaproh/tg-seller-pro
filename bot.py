@@ -132,6 +132,10 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("🔎 Search", callback_data="menu:search"),
             InlineKeyboardButton("📊 Stats", callback_data="menu:stats"),
         ],
+        [
+            InlineKeyboardButton("📦 Storage", callback_data="menu:storage"),
+            InlineKeyboardButton("⚙️ Settings", callback_data="menu:settings"),
+        ],
     ]
     return InlineKeyboardMarkup(buttons)
 
@@ -283,6 +287,7 @@ def build_list_page(page: int) -> tuple[str, InlineKeyboardMarkup]:
 async def set_commands(app: Application) -> None:
     commands = [
         BotCommand("start", "🤖 Show bot menu"),
+        BotCommand("mainmenu", "🏠 Show main menu"),
         BotCommand("help", "❓ Show bot help"),
         BotCommand("add", "➕ Add one account"),
         BotCommand("bulkadd", "📥 Add many accounts"),
@@ -334,7 +339,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• /bulkdelete — 🗑️ delete by IDs or category\n"
         f"• /extractcsv — 📄 extract email/user + password from CSV\n"
         f"• /stats — 📊 see bot usage stats\n"
-        f"• /export — 💾 export the full account list"
+        f"• /export — 💾 export the full account list\n"
+        f"• /mainmenu — 🏠 show main menu anytime"
     )
     await update.effective_message.reply_text(
         text,
@@ -668,9 +674,15 @@ async def extractcsv(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed_guard(update):
         return
 
-    pending_csv_extract[update.effective_user.id] = True
+    pending_csv_extract[update.effective_user.id] = {"stage": "category"}
     await update.effective_message.reply_text(
-        "<b>📄 Upload a CSV file</b>\nI will extract the <b>User ID / Email Address</b> and <b>Password</b> columns into a new CSV.",
+        "<b>📄 Extract from CSV</b>\n"
+        "I will extract the <b>User ID / Email Address</b> and <b>Password</b> columns from your CSV file.\n\n"
+        "The following column headers will be targeted for extraction:\n"
+        "• <b>User ID / Email:</b> <code>userid, user, email, username, account</code>\n"
+        "• <b>Password:</b> <code>password</code>\n\n"
+        "Choose a category to save the extracted accounts:",
+        reply_markup=category_keyboard("csvcat"),
         parse_mode=ParseMode.HTML,
     )
 
@@ -718,8 +730,11 @@ async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed_guard(update):
         return
 
-    if update.effective_user.id not in pending_csv_extract:
+    user_id = update.effective_user.id
+    if user_id not in pending_csv_extract:
         return
+
+    data = pending_csv_extract.pop(user_id)
 
     document = update.effective_message.document
     if not document:
@@ -768,12 +783,11 @@ async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 extracted_rows.append((username, password))
             writer.writerow([username, password])
 
-        category_id = get_category_id_by_name("uncategorized")
+        category_id = data.get("category_id")
         if category_id is None:
-            ok, _message = add_category("uncategorized")
-            if not ok:
-                raise RuntimeError("Could not create uncategorized category")
             category_id = get_category_id_by_name("uncategorized")
+            if category_id is None:
+                raise RuntimeError("Could not get uncategorized category")
 
         summary = add_accounts_bulk(extracted_rows, category_id)
 
@@ -783,9 +797,9 @@ async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_message.reply_document(
             document=InputFile(bio, filename=bio.name),
             caption=(
-                "<b>📄 Extracted CSV</b>\n"
-                f"User/Email + Password only.\n"
-                f"Stored: <code>{summary['added']}</code> new account(s), "
+                f"<b>📄 Extracted CSV</b>\n"
+                f"• <b>Targeted columns:</b> <code>{esc(user_header)}</code> + <code>{esc(password_header)}</code>\n"
+                f"• <b>Stored:</b> <code>{summary['added']}</code> new account(s), "
                 f"skipped duplicates: <code>{summary['skipped']}</code>."
             ),
             parse_mode=ParseMode.HTML,
@@ -797,8 +811,6 @@ async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "<b>❌ Could not extract the columns</b>\nMake sure the CSV has a User/Email column and a Password column.",
             parse_mode=ParseMode.HTML,
         )
-    finally:
-        pending_csv_extract.pop(update.effective_user.id, None)
 
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -956,6 +968,45 @@ async def handle_category_callback(update: Update, context: ContextTypes.DEFAULT
         )
         return
 
+    if prefix == "csvcat":
+        pending_csv_extract[user_id] = {"category_id": category_id, "category_name": category_name}
+        await query.edit_message_text(
+            f"<b>📄 CSV extraction ready</b>\n"
+            f"• <b>Target category:</b> <code>{esc(category_name)}</code>\n\n"
+            f"I will extract the <b>User ID / Email Address</b> and <b>Password</b> columns.\n"
+            f"The following column headers will be targeted:\n"
+            f"• <b>User/Email:</b> <code>userid, user, email, username, account</code>\n"
+            f"• <b>Password:</b> <code>password</code>\n\n"
+            f"Now upload your CSV file.",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+
+async def mainmenu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not allowed_guard(update):
+        return
+
+    text = (
+        f"<b>🤖 {esc(BOT_NAME)}</b>\n"
+        f"<i>🔐 Private vault for {esc(SERVICE_NAME)} credentials</i>\n\n"
+        f"<b>✨ Quick menu</b>\n"
+        f"Tap a button below to jump to the main actions."
+    )
+
+    if update.effective_message:
+        await update.effective_message.reply_text(
+            text,
+            reply_markup=main_menu_keyboard(),
+            parse_mode=ParseMode.HTML,
+        )
+    elif update.callback_query:
+        await update.callback_query.edit_message_text(
+            text,
+            reply_markup=main_menu_keyboard(),
+            parse_mode=ParseMode.HTML,
+        )
+
 
 async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed_guard(update):
@@ -968,16 +1019,17 @@ async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     data = query.data or ""
-    action = data.split(":", 1)[1] if data.startswith("menu:") and ":" in data else data
 
     if data == "menu:add":
         await query.edit_message_text(
-            "<b>➕ Choose how to add an account</b>\n"
-            "Pick the method you want to use.",
+            "<b>➕ Choose how to add an account</b>\n",
             reply_markup=InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("🧾 One account", callback_data="menu:add:single"),
                     InlineKeyboardButton("📥 Bulk import", callback_data="menu:add:bulk"),
+                ],
+                [
+                    InlineKeyboardButton("📄 Extract from CSV", callback_data="menu:add:csv"),
                 ],
                 [InlineKeyboardButton("⬅ Back", callback_data="menu:back")],
             ]),
@@ -994,9 +1046,23 @@ async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "menu:add:bulk":
+        pending_bulk[query.from_user.id] = {"stage": "category"}
         await query.edit_message_text(
-            "<b>📥 Bulk add</b>\n"
+            "<b>📥 Bulk import</b>\n"
             "Choose a category first, then send your accounts line by line.",
+            reply_markup=category_keyboard("bulkcat"),
+            parse_mode=ParseMode.HTML,
+        )
+        logger.info("User %s started bulk add flow via menu", query.from_user.id)
+        return
+
+    if data == "menu:add:csv":
+        pending_csv_extract[query.from_user.id] = {"stage": "category"}
+        await query.edit_message_text(
+            "<b>📄 Extract from CSV</b>\n"
+            "I will extract <b>User ID / Email Address</b> and <b>Password</b> columns.\n\n"
+            "Choose a category to save the extracted accounts:",
+            reply_markup=category_keyboard("csvcat"),
             parse_mode=ParseMode.HTML,
         )
         return
@@ -1010,16 +1076,92 @@ async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    help_text = {
-        "add": "Use /add <username> <password> to save one account.",
-        "get": "Use /getaccounts to retrieve unused accounts from a category.",
-        "accounts": "Use /accounts to review and toggle used/unused accounts.",
-        "list": "Use /list to browse your account inventory page by page.",
-        "search": "Use /search <term> or add filters like category:finance used newest.",
-        "stats": "Use /stats to see account and retrieval summaries.",
-    }.get(action, "Choose an action from the menu.")
+    if data == "menu:get":
+        pending_gets[query.from_user.id] = {"stage": "category"}
+        await query.edit_message_text(
+            "<b>📂 Get accounts</b>\n"
+            "Choose a category and then specify how many accounts you want.",
+            reply_markup=category_keyboard("getcat"),
+            parse_mode=ParseMode.HTML,
+        )
+        logger.info("User %s started getaccounts flow via menu", query.from_user.id)
+        return
 
-    await query.edit_message_text(f"<b>✨ Quick action</b>\n{help_text}", parse_mode=ParseMode.HTML)
+    if data == "menu:accounts":
+        text, reply_markup = build_accounts_page(0)
+        await query.edit_message_text(
+            text,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    if data == "menu:list":
+        text, reply_markup = build_list_page(0)
+        await query.edit_message_text(
+            text,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    if data == "menu:search":
+        await query.edit_message_text(
+            "<b>🔎 Search accounts</b>\n"
+            "Send: <code>/search term</code>\n"
+            "Examples:\n"
+            "• /search gmail\n"
+            "• /search category:finance used\n"
+            "• /search oldest password",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    if data == "menu:stats":
+        data_stats = stats_summary()
+        lines = [
+            f"<b>📊 {esc(BOT_NAME)} statistics</b>",
+            "",
+            f"• <b>Total accounts:</b> <code>{data_stats['total_accounts']}</code>",
+            f"• <b>Total retrieval sessions:</b> <code>{data_stats['total_sessions']}</code>",
+            f"• <b>Total retrieval items:</b> <code>{data_stats['total_items']}</code>",
+            f"• <b>Marked used:</b> <code>{data_stats['used_items']}</code>",
+            f"• <b>Pending:</b> <code>{data_stats['pending_items']}</code>",
+            "",
+            "<b>📂 By category</b>",
+        ]
+        for row in data_stats["categories"]:
+            lines.append(f"• <code>{esc(row['name'])}</code>  <i>({row['account_count']})</i>")
+        await query.edit_message_text("\n".join(lines), parse_mode=ParseMode.HTML)
+        return
+
+    if data == "menu:storage":
+        text, reply_markup = build_pending_page(0)
+        await query.edit_message_text(
+            text,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    if data == "menu:settings":
+        await query.edit_message_text(
+            "<b>⚙️ Settings</b>\n"
+            "Available commands:\n"
+            "• /categories — view all categories\n"
+            "• /addcategory — create a category\n"
+            "• /deletecategory — remove a category\n"
+            "• /logs — recent retrieval activity\n"
+            "• /unused — pending retrieval items\n"
+            "• /markused — mark item used\n"
+            "• /markunused — mark item unused\n"
+            "• /bulkdelete — delete by IDs or category\n"
+            "• /export — export the full account list",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    await query.edit_message_text("❌ Unknown menu action.", parse_mode=ParseMode.HTML)
 
 
 async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1355,6 +1497,7 @@ def build_app() -> Application:
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("mainmenu", mainmenu))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("add", add))
     app.add_handler(CommandHandler("bulkadd", bulkadd))
@@ -1373,7 +1516,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("export", export))
 
-    app.add_handler(CallbackQueryHandler(handle_category_callback, pattern=r"^(addcat|bulkcat|getcat):"))
+    app.add_handler(CallbackQueryHandler(handle_category_callback, pattern=r"^(addcat|bulkcat|getcat|csvcat):"))
     app.add_handler(CallbackQueryHandler(handle_main_menu, pattern=r"^menu:"))
     app.add_handler(CallbackQueryHandler(handle_session_callback, pattern=r"^(sess|pending|itemused|itemunused|accountpage|accounttoggle|listpage|delconfirm|delcancel|delcatconfirm|delcatcancel|bulkconfirm|bulkcancel):"))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_csv_upload))
