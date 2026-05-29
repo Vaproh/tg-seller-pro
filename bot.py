@@ -1073,8 +1073,13 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
         return
 
     if query.data.startswith("pending:page:"):
+        parts = query.data.split(":")
+        if len(parts) != 3 or parts[0] != "pending" or parts[1] != "page":
+            await query.answer("Invalid page.")
+            return
+
         try:
-            page = int(query.data.split(":", 2)[2])
+            page = int(parts[2])
         except ValueError:
             await query.answer("Invalid page.")
             return
@@ -1114,8 +1119,13 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
         return
 
     if query.data.startswith("accountpage:"):
+        parts = query.data.split(":")
+        if len(parts) != 2 or parts[0] != "accountpage":
+            await query.answer("Invalid page.")
+            return
+
         try:
-            page = int(query.data.split(":", 2)[2])
+            page = int(parts[1])
         except ValueError:
             await query.answer("Invalid page.")
             return
