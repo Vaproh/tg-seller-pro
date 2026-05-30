@@ -686,49 +686,35 @@ async def perform_search(update: Update, raw: str) -> None:
             password=password_term,
         )
 
+    filter_text = []
+    if category:
+        filter_text.append(f"Category: <code>{esc(category)}</code>")
+    if used is not None:
+        filter_text.append(f"Status: <code>{'used' if used else 'unused'}</code>")
+    if exact_id is not None:
+        filter_text.append(f"ID: <code>{exact_id}</code>")
+    if username_term:
+        filter_text.append(f"Username: <code>{esc(username_term)}</code>")
+    if password_term:
+        filter_text.append(f"Password: <code>{esc(password_term)}</code>")
+
     if not results:
-        filter_text = []
-        if category:
-            filter_text.append(f"Category: <code>{esc(category)}</code>")
-        if used is not None:
-            filter_text.append(f"Status: <code>{'used' if used else 'unused'}</code>")
-        if exact_id is not None:
-            filter_text.append(f"ID: <code>{exact_id}</code>")
-        if username_term:
-            filter_text.append(f"Username: <code>{esc(username_term)}</code>")
-        if password_term:
-            filter_text.append(f"Password: <code>{esc(password_term)}</code>")
+        filter_line = "• " + " | ".join(filter_text) if filter_text else ""
         await update.effective_message.reply_text(
-            "\n".join(
-                [
-                    f"<b>🔍 No matches</b> <code>{esc(term or 'all')}</code>",
-                    f"• " + " | ".join(filter_text) if filter_text else "",
-                ]
-            ).strip(),
+            f"<b>🔍 No matches</b> <code>{esc(term or 'all')}</code>\n{filter_line}",
             parse_mode=ParseMode.HTML,
         )
         return
 
-    filters = []
-    if category:
-        filters.append(f"Category: <code>{esc(category)}</code>")
-    if used is not None:
-        filters.append(f"Status: <code>{'used' if used else 'unused'}</code>")
-    if exact_id is not None:
-        filters.append(f"ID: <code>{exact_id}</code>")
-    if username_term:
-        filters.append(f"Username: <code>{esc(username_term)}</code>")
-    if password_term:
-        filters.append(f"Password: <code>{esc(password_term)}</code>")
-    filters.append(f"Sort: <code>{'newest' if newest_first else 'oldest'}</code>")
+    filter_text.append(f"Sort: <code>{'newest' if newest_first else 'oldest'}</code>")
 
     count = len(results)
     header = [
         f"<b>Search results</b> <code>{esc(term or 'all')}</code>",
         f"• <b>Found:</b> <code>{count}</code> result{'s' if count != 1 else ''}</code>",
     ]
-    if filters:
-        header.append("• " + " | ".join(filters))
+    if filter_text:
+        header.append("• " + " | ".join(filter_text))
 
     parts = ["\n".join(header)]
     for row in results[:25]:
@@ -1488,6 +1474,7 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
         filters = pending_search.get(user_id, {}).get("filters", {})
 
         if search_type == "term":
+            pending_search[user_id] = {"stage": "value", "filters": filters}
             await query.edit_message_text(
                 "<b>📝 Search term</b>\nSend the term to search in username, password, or category.",
                 parse_mode=ParseMode.HTML,
