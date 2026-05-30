@@ -96,6 +96,7 @@ pending_bulk_delete_confirm: dict[int, str] = {}
 pending_delete_confirm: dict[int, int] = {}
 pending_delete_category_confirm: dict[int, str] = {}
 pending_csv_extract: dict[int, dict] = {}
+pending_search: dict[int, dict] = {}
 
 
 def esc(value) -> str:
@@ -592,19 +593,36 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     raw = " ".join(context.args).strip()
-    if not raw:
-        await update.effective_message.reply_text(
-            "<b>Usage</b>\n"
-            "<code>🔎 /search term [filters]</code>\n"
-            "Examples:\n"
-            "• /search gmail\n"
-            "• /search category:finance used\n"
-            "• /search username:john password:123 sort:oldest\n"
-            "• /search id:123",
-            parse_mode=ParseMode.HTML,
-        )
+    if raw:
+        # Text-based search (backward compatible)
+        await perform_search(update, raw)
         return
 
+    pending_search[update.effective_user.id] = {"stage": "type", "filters": {}}
+    await update.effective_message.reply_text(
+        "<b>🔎 Search accounts</b>\nChoose search type:",
+        reply_markup=InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("📝 Search term", callback_data="search:type:term"),
+                InlineKeyboardButton("👤 Search username", callback_data="search:type:username"),
+            ],
+            [
+                InlineKeyboardButton("🔑 Search password", callback_data="search:type:password"),
+                InlineKeyboardButton("🆔 Search by ID", callback_data="search:type:id"),
+            ],
+            [
+                InlineKeyboardButton("📂 Filter by category", callback_data="search:type:category"),
+            ],
+            [
+                InlineKeyboardButton("🔴 Used", callback_data="search:type:used"),
+                InlineKeyboardButton("🟢 Unused", callback_data="search:type:unused"),
+            ],
+        ]),
+        parse_mode=ParseMode.HTML,
+    )
+
+
+async def perform_search(update: Update, raw: str) -> None:
     tokens = raw.split()
     category = None
     used = None
@@ -1446,7 +1464,7 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
             keyboard.append([
                 InlineKeyboardButton(f"✅ Mark used", callback_data=f"itemused:{row['item_id']}:0:{session_id}"),
                 InlineKeyboardButton(f"♻️ Mark unused", callback_data=f"itemunused:{row['item_id']}:0:{session_id}"),
-            ])
+])
 
         keyboard.append([
             InlineKeyboardButton("🗑️ Delete session", callback_data=f"delsessconfirm:{session_id}"),
@@ -1457,6 +1475,80 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode=ParseMode.HTML,
         )
+        return
+
+    if query.data.startswith("search:type:"):
+        parts = query.data.split(":")
+        if len(parts) != 3:
+            await query.answer("Invalid option.")
+            return
+
+        search_type = parts[2]
+        user_id = query.from_user.id
+        filters = pending_search.get(user_id, {}).get("filters", {})
+
+        if search_type == "term":
+            await query.edit_message_text(
+                "<b>📝 Search term</b>\nSend the term to search in username, password, or category.",
+                parse_mode=ParseMode.HTML,
+            )
+            return
+
+        if search_type == "username":
+            filters["type"] = "username"
+            pending_search[user_id] = {"stage": "value", "filters": filters}
+            await query.edit_message_text(
+                "<b>👤 Search by username</b>\nSend the username to search for.",
+                parse_mode=ParseMode.HTML,
+            )
+            return
+
+        if search_type == "password":
+            filters["type"] = "password"
+            pending_search[user_id] = {"stage": "value", "filters": filters}
+            await query.edit_message_text(
+                "<b>🔑 Search by password</b>\nSend the password to search for.",
+                parse_mode=ParseMode.HTML,
+            )
+            return
+
+        if search_type == "id":
+            filters["type"] = "id"
+            pending_search[user_id] = {"stage": "value", "filters": filters}
+            await query.edit_message_text(
+                "<b>🆔 Search by ID</b>\nSend the account ID.",
+                parse_mode=ParseMode.HTML,
+            )
+            return
+
+        if search_type == "category":
+            filters["type"] = "category"
+            pending_search[user_id] = {"stage": "value", "filters": filters}
+            await query.edit_message_text(
+                "<b>📂 Search by category</b>\nSend the category name.",
+                parse_mode=ParseMode.HTML,
+            )
+            return
+
+        if search_type == "used":
+            filters["used"] = True
+            pending_search[user_id] = {"stage": "value", "filters": filters}
+            await query.edit_message_text(
+                "<b>🔴 Used accounts filter</b>\nNow send an optional category name to filter by, or send 'all' to search all categories.",
+                parse_mode=ParseMode.HTML,
+            )
+            return
+
+        if search_type == "unused":
+            filters["used"] = False
+            pending_search[user_id] = {"stage": "value", "filters": filters}
+            await query.edit_message_text(
+                "<b>🟢 Unused accounts filter</b>\nNow send an optional category name to filter by, or send 'all' to search all categories.",
+                parse_mode=ParseMode.HTML,
+            )
+            return
+
+        await query.answer("Unknown search type.")
         return
 
     if query.data.startswith("pending:page:"):
@@ -1774,6 +1866,29 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
         return
 
+    if user_id in pending_search:
+        data = pending_search.pop(user_id)
+        search_type = data.get("filters", {}).get("type")
+        used_filter = data.get("filters", {}).get("used")
+
+        if search_type == "username":
+            await perform_search(update, f"username:{text.strip()}")
+        elif search_type == "password":
+            await perform_search(update, f"password:{text.strip()}")
+        elif search_type == "id":
+            await perform_search(update, f"id:{text.strip()}")
+        elif search_type == "category":
+            await perform_search(update, f"category:{text.strip()}")
+        elif search_type in ("used", "unused"):
+            if text.strip().lower() == "all":
+                await perform_search(update, "used" if used_filter else "unused")
+            else:
+                await perform_search(update, f"{text.strip()} {'used' if used_filter else 'unused'}")
+        else:
+            # term search or default
+            await perform_search(update, text.strip())
+        return
+
     if user_id in pending_gets:
         data = pending_gets.pop(user_id)
         try:
@@ -1905,7 +2020,7 @@ def build_app() -> Application:
 
     app.add_handler(CallbackQueryHandler(handle_category_callback, pattern=r"^(addcat|bulkcat|getcat|csvcat):"))
     app.add_handler(CallbackQueryHandler(handle_main_menu, pattern=r"^menu:"))
-    app.add_handler(CallbackQueryHandler(handle_session_callback, pattern=r"^(sess|pending|itemused|itemunused|accountpage|accounttoggle|listpage|delconfirm|delcancel|delcatconfirm|delcatcancel|delsessconfirm|bulkconfirm|bulkcancel|csvconfirm|csvcancel):"))
+    app.add_handler(CallbackQueryHandler(handle_session_callback, pattern=r"^(sess|pending|itemused|itemunused|accountpage|accounttoggle|listpage|delconfirm|delcancel|delcatconfirm|delcatcancel|delsessconfirm|bulkconfirm|bulkcancel|csvconfirm|csvcancel|search):"))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_csv_upload))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_error_handler(error_handler)
