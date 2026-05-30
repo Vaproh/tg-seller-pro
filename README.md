@@ -16,7 +16,13 @@ SERVICE_NAME=Service Name
 Install dependencies:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+```
+
+Create a `.env` file from the example:
+
+```bash
+copy .env.example .env
 ```
 
 Run:
@@ -31,9 +37,14 @@ python bot.py
 - /add
 - /bulkadd
 - /getaccounts
+- /getid
 - /search
 - /delete
 - /categories
+
+## Search filters
+
+Use `category:<name>`, `status:used`, `status:unused`, `sort:newest`, `sort:oldest`, `username:<term>`, `password:<term>`, or `id:<number>`.
 - /addcategory
 - /deletecategory
 - /logs

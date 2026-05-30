@@ -271,16 +271,35 @@ def add_accounts_bulk(items: Iterable[tuple[str, str]], category_id: int) -> dic
     }
 
 
-def search_accounts(term: str, category: str | None = None, used: bool | None = None, newest_first: bool = True) -> list[sqlite3.Row]:
+def search_accounts(
+    term: str,
+    category: str | None = None,
+    used: bool | None = None,
+    newest_first: bool = True,
+    username: str | None = None,
+    password: str | None = None,
+) -> list[sqlite3.Row]:
     term = term.strip()
     conn = connect()
     query = """
         SELECT a.id, a.username, a.password, c.name AS category, a.created_at, a.used
         FROM accounts a
         JOIN categories c ON c.id = a.category_id
-        WHERE (a.username LIKE ? OR a.password LIKE ? OR c.name LIKE ?)
+        WHERE 1=1
     """
-    params: list[object] = [f"%{term}%", f"%{term}%", f"%{term}%"]
+    params: list[object] = []
+
+    if term:
+        query += " AND (a.username LIKE ? OR a.password LIKE ? OR c.name LIKE ?)"
+        params.extend([f"%{term}%", f"%{term}%", f"%{term}%"])
+
+    if username:
+        query += " AND a.username LIKE ?"
+        params.append(f"%{username}%")
+
+    if password:
+        query += " AND a.password LIKE ?"
+        params.append(f"%{password}%")
 
     if category:
         query += " AND c.name LIKE ?"
@@ -406,25 +425,45 @@ def count_pending_items() -> int:
     return int(row["count"]) if row else 0
 
 
-def list_accounts(limit: int = 20, offset: int = 0) -> list[sqlite3.Row]:
+def list_accounts(limit: int = 20, offset: int = 0, used: bool | None = None, category_id: int | None = None) -> list[sqlite3.Row]:
     conn = connect()
-    rows = conn.execute(
-        """
+    query = """
         SELECT a.id, a.username, a.password, c.name AS category, a.created_at, a.used, a.used_at
         FROM accounts a
         JOIN categories c ON c.id = a.category_id
-        ORDER BY a.id ASC
-        LIMIT ? OFFSET ?
-        """,
-        (limit, offset),
-    ).fetchall()
+    """
+    clauses: list[str] = []
+    params: list[object] = []
+    if used is not None:
+        clauses.append("a.used = ?")
+        params.append(1 if used else 0)
+    if category_id is not None and category_id > 0:
+        clauses.append("a.category_id = ?")
+        params.append(category_id)
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
+    query += " ORDER BY a.id ASC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+
+    rows = conn.execute(query, params).fetchall()
     conn.close()
     return rows
 
 
-def count_accounts() -> int:
+def count_accounts(used: bool | None = None, category_id: int | None = None) -> int:
     conn = connect()
-    row = conn.execute("SELECT COUNT(*) AS count FROM accounts").fetchone()
+    query = "SELECT COUNT(*) AS count FROM accounts"
+    clauses: list[str] = []
+    params: list[object] = []
+    if used is not None:
+        clauses.append("used = ?")
+        params.append(1 if used else 0)
+    if category_id is not None and category_id > 0:
+        clauses.append("category_id = ?")
+        params.append(category_id)
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
+    row = conn.execute(query, params).fetchone()
     conn.close()
     return int(row["count"]) if row else 0
 
@@ -495,7 +534,7 @@ def get_session_items(session_id: int) -> list[sqlite3.Row]:
     rows = conn.execute(
         """
         SELECT i.id AS item_id, i.position, i.used, i.used_at,
-               a.id AS account_id, a.username, a.password, c.name AS category
+               a.id As account_id, a.username, a.password, c.name AS category
         FROM retrieval_items i
         JOIN accounts a ON a.id = i.account_id
         JOIN categories c ON c.id = a.category_id
@@ -506,6 +545,14 @@ def get_session_items(session_id: int) -> list[sqlite3.Row]:
     ).fetchall()
     conn.close()
     return rows
+
+
+def delete_session(session_id: int) -> bool:
+    conn = connect()
+    cur = conn.execute("DELETE FROM retrieval_sessions WHERE id = ?", (session_id,))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
 
 
 def get_item(item_id: int) -> sqlite3.Row | None:
@@ -535,6 +582,17 @@ def set_item_used(item_id: int, used: bool) -> bool:
         """,
         (1 if used else 0, 1 if used else 0, item_id),
     )
+    if cur.rowcount > 0:
+        conn.execute(
+            """
+            UPDATE accounts
+            SET used = ?, used_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END
+            WHERE id = (
+                SELECT account_id FROM retrieval_items WHERE id = ?
+            )
+            """,
+            (1 if used else 0, 1 if used else 0, item_id),
+        )
     conn.commit()
     conn.close()
     return cur.rowcount > 0

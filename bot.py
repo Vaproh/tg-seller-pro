@@ -4,6 +4,8 @@ import csv
 import html
 import io
 import logging
+import sqlite3
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from telegram import (
@@ -12,6 +14,7 @@ from telegram import (
     InlineKeyboardMarkup,
     Update,
 )
+from urllib.parse import quote
 from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
@@ -33,6 +36,7 @@ from database import (
     delete_accounts_by_ids,
     delete_accounts_in_category,
     delete_category,
+    delete_session,
     export_accounts_csv,
     get_category_name,
     get_item,
@@ -62,7 +66,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 log_file = LOG_DIR / f"{BOT_NAME.lower().replace(' ', '_')}.log"
 log_formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
-file_handler = logging.FileHandler(log_file, encoding="utf-8")
+file_handler = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8")
 file_handler.setFormatter(log_formatter)
 file_handler.setLevel(logging.INFO)
 console_handler = logging.StreamHandler()
@@ -91,7 +95,7 @@ pending_bulk_delete: dict[int, str] = {}
 pending_bulk_delete_confirm: dict[int, str] = {}
 pending_delete_confirm: dict[int, int] = {}
 pending_delete_category_confirm: dict[int, str] = {}
-pending_csv_extract: dict[int, bool] = {}
+pending_csv_extract: dict[int, dict] = {}
 
 
 def esc(value) -> str:
@@ -106,9 +110,20 @@ def is_allowed(update: Update) -> bool:
 def allowed_guard(update: Update) -> bool:
     if is_allowed(update):
         return True
+
     user = update.effective_user
+    payload = ""
+    if update.effective_message and update.effective_message.text:
+        payload = update.effective_message.text
+    elif update.callback_query and update.callback_query.data:
+        payload = update.callback_query.data
+
     if user:
-        logger.warning("Unauthorized access attempt from user_id=%s", user.id)
+        logger.warning(
+            "Unauthorized access attempt from user_id=%s payload=%s",
+            user.id,
+            payload,
+        )
     return False
 
 
@@ -246,38 +261,71 @@ def build_accounts_page(page: int) -> tuple[str, InlineKeyboardMarkup]:
     return "\n\n".join(text), InlineKeyboardMarkup(keyboard)
 
 
-def build_list_page(page: int) -> tuple[str, InlineKeyboardMarkup]:
-    total = count_accounts()
+def build_list_page(page: int, filter_mode: str = "all", category_id: int = 0) -> tuple[str, InlineKeyboardMarkup]:
+    filter_label = {
+        "all": "All",
+        "unused": "Unused",
+        "used": "Used",
+    }.get(filter_mode, "All")
+    used_filter = None if filter_mode == "all" else filter_mode == "used"
+    category_name = "All categories" if category_id == 0 else get_category_name(category_id) or "Unknown"
+
+    total = count_accounts(used_filter, category_id if category_id > 0 else None)
     offset = page * LIST_PAGE_SIZE
-    rows = list_accounts(LIST_PAGE_SIZE, offset)
+    rows = list_accounts(LIST_PAGE_SIZE, offset, used_filter, category_id if category_id > 0 else None)
 
     if not rows:
         return (
-            "<b>📋 Accounts</b>\n\n<em>No accounts found.</em>",
+            f"<b>📋 Accounts ({filter_label} / {esc(category_name)})</b>\n\n<em>No accounts found.</em>",
             InlineKeyboardMarkup([]),
         )
 
     text = [
-        f"<b>📋 Accounts</b>  <code>page {page + 1}/{max(1, (total + LIST_PAGE_SIZE - 1) // LIST_PAGE_SIZE)}</code>"
+        f"<b>📋 Accounts</b>  <code>{esc(filter_label)}</code>  <code>{esc(category_name)}</code>  <code>page {page + 1}/{max(1, (total + LIST_PAGE_SIZE - 1) // LIST_PAGE_SIZE)}</code>"
     ]
-    keyboard = []
+    keyboard = [
+        [
+            InlineKeyboardButton("📌 All", callback_data=f"listpage:0:all:{category_id}"),
+            InlineKeyboardButton("🟢 Unused", callback_data=f"listpage:0:unused:{category_id}"),
+            InlineKeyboardButton("🔴 Used", callback_data=f"listpage:0:used:{category_id}"),
+        ]
+    ]
+
+    categories = list_categories()
+    category_buttons: list[list[InlineKeyboardButton]] = [
+        [InlineKeyboardButton("📂 All categories", callback_data=f"listpage:0:{filter_mode}:0")]
+    ]
+    for index in range(0, len(categories), 2):
+        row = []
+        for category in categories[index : index + 2]:
+            row.append(
+                InlineKeyboardButton(
+                    f"{category['name']}",
+                    callback_data=f"listpage:0:{filter_mode}:{category['id']}",
+                )
+            )
+        category_buttons.append(row)
+    keyboard.extend(category_buttons)
 
     for row in rows:
+        status = "used" if row["used"] else "unused"
         text.append(
             "• <b>ID:</b> <code>{id}</code>  |  "
             "<b>User:</b> <code>{username}</code>  |  "
-            "<b>Category:</b> <code>{category}</code>".format(
+            "<b>Category:</b> <code>{category}</code>  |  "
+            "<b>Status:</b> <code>{status}</code>".format(
                 id=row['id'],
                 username=esc(row['username']),
                 category=esc(row['category']),
+                status=status,
             )
         )
 
     nav_buttons = []
     if page > 0:
-        nav_buttons.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"listpage:{page - 1}"))
+        nav_buttons.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"listpage:{page - 1}:{filter_mode}:{category_id}"))
     if offset + len(rows) < total:
-        nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"listpage:{page + 1}"))
+        nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"listpage:{page + 1}:{filter_mode}:{category_id}"))
     if nav_buttons:
         keyboard.append(nav_buttons)
 
@@ -292,12 +340,16 @@ async def set_commands(app: Application) -> None:
         BotCommand("add", "➕ Add one account"),
         BotCommand("bulkadd", "📥 Add many accounts"),
         BotCommand("getaccounts", "📂 Retrieve unused accounts"),
+        BotCommand("getid", "🧾 Retrieve an account by ID"),
+        BotCommand("logs", "📜 View retrieval logs"),
+        BotCommand("delsession", "❌ Delete a retrieval session"),
+        BotCommand("markused", "✅ Show pending items to mark used"),
+        BotCommand("markunused", "♻️ Show accounts to toggle unused"),
         BotCommand("search", "🔎 Search accounts"),
         BotCommand("delete", "🗑️ Delete an account"),
         BotCommand("categories", "🗂️ List categories"),
         BotCommand("addcategory", "🆕 Create a category"),
         BotCommand("deletecategory", "❌ Delete a category"),
-        BotCommand("logs", "📜 View retrieval logs"),
         BotCommand("unused", "⏳ Pending retrieval items menu"),
         BotCommand("accounts", "👥 Manage account used status"),
         BotCommand("list", "📋 Browse accounts by page"),
@@ -316,6 +368,17 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await start(update, context)
 
 
+async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not allowed_guard(update):
+        return
+
+    if update.effective_message:
+        await update.effective_message.reply_text(
+            "<b>❓ Unknown command.</b>\nUse /help to view available actions.",
+            parse_mode=ParseMode.HTML,
+        )
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed_guard(update):
         return
@@ -327,12 +390,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• /add — ➕ save one account\n"
         f"• /bulkadd — 📥 import multiple accounts\n"
         f"• /getaccounts — 📂 pull unused accounts\n"
-        f"• /search — 🔎 find an account quickly\n"
+        f"• /getid — 🧾 retrieve an account by ID\n"
+        f"• /search — 🔎 find an account with filters\n"
         f"• /delete — 🗑️ remove an account by ID\n"
         f"• /categories — 🗂️ view all categories\n"
         f"• /addcategory — 🆕 create a category\n"
         f"• /deletecategory — ❌ remove a category\n"
         f"• /logs — 📜 recent retrieval activity\n"
+        f"• /delsession — ❌ delete a retrieval session\n"
         f"• /unused — ⏳ review pending retrieval items\n"
         f"• /accounts — 👥 manage used/unused status\n"
         f"• /list — 📋 browse accounts page by page\n"
@@ -396,6 +461,56 @@ async def getaccounts(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.HTML,
     )
     logger.info("User %s started getaccounts flow", update.effective_user.id)
+
+
+async def getid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not allowed_guard(update):
+        return
+
+    if not context.args:
+        await update.effective_message.reply_text(
+            "<b>Usage</b>\n<code>➕ /getid account_id</code>",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    try:
+        account_id = int(context.args[0])
+    except ValueError:
+        await update.effective_message.reply_text(
+            "<b>❗ Account ID must be a number</b>",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    account = get_account_by_id(account_id)
+    if not account:
+        await update.effective_message.reply_text(
+            f"<b>❌ No account found with ID</b> <code>{account_id}</code>",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    was_used = bool(account["used"])
+    # Do not mark as used on retrieval; user marks as used manually when account is sold/given
+
+    await update.effective_message.reply_text(
+        "\n".join([
+            "<b>📌 Account details</b>",
+            f"• <b>ID:</b> <code>{account_id}</code>",
+            f"• <b>Username:</b> <code>{esc(account['username'])}</code>",
+            f"• <b>Password:</b> <tg-spoiler>{esc(account['password'])}</tg-spoiler>",
+            f"• <b>Category:</b> <code>{esc(account['category'])}</code>",
+            f"• <b>Status:</b> <code>{'already used' if was_used else 'unused'}</code>",
+        ]),
+        parse_mode=ParseMode.HTML,
+    )
+    logger.info(
+        "Fetched account %s by ID for user %s, used=%s",
+        account_id,
+        update.effective_user.id,
+        was_used,
+    )
 
 
 async def addcategory(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -480,11 +595,12 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not raw:
         await update.effective_message.reply_text(
             "<b>Usage</b>\n"
-            "<code>🔎 /search term</code>\n"
+            "<code>🔎 /search term [filters]</code>\n"
             "Examples:\n"
             "• /search gmail\n"
             "• /search category:finance used\n"
-            "• /search old password oldest",
+            "• /search username:john password:123 sort:oldest\n"
+            "• /search id:123",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -493,25 +609,84 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     category = None
     used = None
     newest_first = True
+    exact_id = None
+    username_term = None
+    password_term = None
 
     filtered_tokens = []
     for token in tokens:
         lower = token.lower()
         if lower.startswith("category:") or lower.startswith("cat:"):
             category = token.split(":", 1)[1].strip()
+        elif lower.startswith("status:"):
+            status_value = token.split(":", 1)[1].strip().lower()
+            if status_value in ("used", "unused"):
+                used = status_value == "used"
         elif lower in ("used", "unused"):
             used = lower == "used"
+        elif lower.startswith("sort:"):
+            sort_value = token.split(":", 1)[1].strip().lower()
+            if sort_value in ("newest", "oldest"):
+                newest_first = sort_value == "newest"
         elif lower in ("newest", "oldest"):
             newest_first = lower == "newest"
+        elif lower.startswith("id:") or lower.startswith("account:"):
+            try:
+                exact_id = int(token.split(":", 1)[1].strip())
+            except ValueError:
+                pass
+        elif lower.startswith("username:"):
+            username_term = token.split(":", 1)[1].strip()
+        elif lower.startswith("password:"):
+            password_term = token.split(":", 1)[1].strip()
         else:
             filtered_tokens.append(token)
 
     term = " ".join(filtered_tokens).strip()
-    rows = search_accounts(term, category=category, used=used, newest_first=newest_first)
+    results: list[sqlite3.Row] = []
 
-    if not rows:
+    if exact_id is not None:
+        account = get_account_by_id(exact_id)
+        if account:
+            if category and category.lower() not in account["category"].lower():
+                account = None
+            if used is not None and bool(account["used"] if account else False) != used:
+                account = None
+            if username_term and username_term.lower() not in account["username"].lower():
+                account = None
+            if password_term and password_term.lower() not in account["password"].lower():
+                account = None
+        if account:
+            results = [account]
+    else:
+        results = search_accounts(
+            term,
+            category=category,
+            used=used,
+            newest_first=newest_first,
+            username=username_term,
+            password=password_term,
+        )
+
+    if not results:
+        filter_text = []
+        if category:
+            filter_text.append(f"Category: <code>{esc(category)}</code>")
+        if used is not None:
+            filter_text.append(f"Status: <code>{'used' if used else 'unused'}</code>")
+        if exact_id is not None:
+            filter_text.append(f"ID: <code>{exact_id}</code>")
+        if username_term:
+            filter_text.append(f"Username: <code>{esc(username_term)}</code>")
+        if password_term:
+            filter_text.append(f"Password: <code>{esc(password_term)}</code>")
         await update.effective_message.reply_text(
-            f"<b>🔍 No matches for</b> <code>{esc(term)}</code>",
+            "\n".join(
+                [
+                    f"<b>🔍 No matches</b> <code>{esc(term or 'all')}</code>",
+                    f"• " + " | ".join(filter_text) if filter_text else "",
+                ]
+            ).strip(),
             parse_mode=ParseMode.HTML,
         )
         return
@@ -521,20 +696,38 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         filters.append(f"Category: <code>{esc(category)}</code>")
     if used is not None:
         filters.append(f"Status: <code>{'used' if used else 'unused'}</code>")
+    if exact_id is not None:
+        filters.append(f"ID: <code>{exact_id}</code>")
+    if username_term:
+        filters.append(f"Username: <code>{esc(username_term)}</code>")
+    if password_term:
+        filters.append(f"Password: <code>{esc(password_term)}</code>")
     filters.append(f"Sort: <code>{'newest' if newest_first else 'oldest'}</code>")
 
-    parts = [f"<b>Search results for</b> <code>{esc(term or 'all')}</code>"]
+    count = len(results)
+    header = [
+        f"<b>Search results</b> <code>{esc(term or 'all')}</code>",
+        f"• <b>Found:</b> <code>{count}</code> result{'s' if count != 1 else ''}</code>",
+    ]
     if filters:
-        parts.append("• " + " | ".join(filters))
-    for row in rows[:20]:
+        header.append("• " + " | ".join(filters))
+
+    parts = ["\n".join(header)]
+    for row in results[:25]:
         parts.append(
             "╭──────────────────────────\n"
             f"│ <b>ID:</b> <code>{row['id']}</code>\n"
             f"│ <b>Username:</b> <code>{esc(row['username'])}</code>\n"
-            f"│ <b>Password:</b> <code>{esc(row['password'])}</code>\n"
+            f"│ <b>Password:</b> <tg-spoiler>{esc(row['password'])}</tg-spoiler>\n"
             f"│ <b>Category:</b> <code>{esc(row['category'])}</code>\n"
+            f"│ <b>Status:</b> <code>{'used' if row['used'] else 'unused'}</code>\n"
+            f"│ <b>Saved:</b> <code>{esc(row['created_at'])}</code>\n"
             "╰──────────────────────────"
         )
+
+    if count > 25:
+        parts.append(f"<b>⚠️ Showing first 25 of {count} results</b>")
+
     await update.effective_message.reply_text("\n\n".join(parts), parse_mode=ParseMode.HTML)
 
 
@@ -606,6 +799,48 @@ async def logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def delsession(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not allowed_guard(update):
+        return
+
+    if not context.args:
+        await update.effective_message.reply_text(
+            "<b>Usage</b>\n<code>❌ /delsession session_id</code>",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    try:
+        session_id = int(context.args[0])
+    except ValueError:
+        await update.effective_message.reply_text(
+            "<b>❗ Session ID must be a number</b>",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    session = get_session(session_id)
+    if not session:
+        await update.effective_message.reply_text(
+            f"<b>❌ No session found with ID</b> <code>{session_id}</code>",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    ok = delete_session(session_id)
+    if ok:
+        logger.info("Deleted session %s by user %s", session_id, update.effective_user.id)
+        await update.effective_message.reply_text(
+            f"<b>🗑️ Session deleted</b> <code>{session_id}</code>",
+            parse_mode=ParseMode.HTML,
+        )
+    else:
+        await update.effective_message.reply_text(
+            f"<b>❌ Could not delete session</b> <code>{session_id}</code>",
+            parse_mode=ParseMode.HTML,
+        )
+
+
 async def unused(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed_guard(update):
         return
@@ -634,7 +869,7 @@ async def list_accounts_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed_guard(update):
         return
 
-    text, reply_markup = build_list_page(0)
+    text, reply_markup = build_list_page(0, "all", 0)
     await update.effective_message.reply_text(
         text,
         reply_markup=reply_markup,
@@ -734,7 +969,7 @@ async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id not in pending_csv_extract:
         return
 
-    data = pending_csv_extract.pop(user_id)
+    data = pending_csv_extract.get(user_id)
 
     document = update.effective_message.document
     if not document:
@@ -772,39 +1007,45 @@ async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not user_header or not password_header:
             raise ValueError("Could not find the required columns")
 
-        extracted_rows = []
-        out = io.StringIO(newline="")
-        writer = csv.writer(out)
-        writer.writerow(["User ID / Email Address", "Password"])
-        for row in reader:
-            username = (row.get(user_header, "") or "").strip()
-            password = (row.get(password_header, "") or "").strip()
-            if username and password:
-                extracted_rows.append((username, password))
-            writer.writerow([username, password])
+        # Save detection and raw CSV to pending state and ask for confirmation
+        pending_csv_extract[user_id].update(
+            {
+                "raw_text": text,
+                "detected_user_header": user_header,
+                "detected_password_header": password_header,
+            }
+        )
 
-        category_id = data.get("category_id")
-        if category_id is None:
-            category_id = get_category_id_by_name("uncategorized")
-            if category_id is None:
-                raise RuntimeError("Could not get uncategorized category")
+        # Show a short preview and ask user to confirm the import
+        preview = []
+        reader2 = csv.DictReader(io.StringIO(text))
+        for i, r in enumerate(reader2):
+            if i >= 3:
+                break
+            u = (r.get(user_header, "") or "").strip()
+            p = (r.get(password_header, "") or "").strip()
+            preview.append(f"• {esc(u)}  /  {esc(p)}")
 
-        summary = add_accounts_bulk(extracted_rows, category_id)
-
-        bio = io.BytesIO(out.getvalue().encode("utf-8"))
-        bio.name = "extracted_accounts.csv"
-        bio.seek(0)
-        await update.effective_message.reply_document(
-            document=InputFile(bio, filename=bio.name),
-            caption=(
-                f"<b>📄 Extracted CSV</b>\n"
-                f"• <b>Targeted columns:</b> <code>{esc(user_header)}</code> + <code>{esc(password_header)}</code>\n"
-                f"• <b>Stored:</b> <code>{summary['added']}</code> new account(s), "
-                f"skipped duplicates: <code>{summary['skipped']}</code>."
+        await update.effective_message.reply_text(
+            (
+                "<b>📄 CSV detected</b>\n"
+                f"• <b>Detected user/email column:</b> <code>{esc(user_header)}</code>\n"
+                f"• <b>Detected password column:</b> <code>{esc(password_header)}</code>\n\n"
+                "Sample rows (first 3):\n"
+                + "\n".join(preview)
             ),
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(
+                        "✅ Confirm import",
+                        callback_data=f"csvconfirm:{quote(user_header)}:{quote(password_header)}",
+                    ),
+                    InlineKeyboardButton("❌ Cancel", callback_data="csvcancel:0"),
+                ]
+            ]),
             parse_mode=ParseMode.HTML,
         )
-        logger.info("CSV extracted for user %s: added=%s skipped=%s", update.effective_user.id, summary['added'], summary['skipped'])
+        return
     except Exception as exc:
         logger.warning("CSV extraction failed for user %s: %s", update.effective_user.id, exc)
         await update.effective_message.reply_text(
@@ -1151,10 +1392,10 @@ async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• /categories — view all categories\n"
             "• /addcategory — create a category\n"
             "• /deletecategory — remove a category\n"
-            "• /logs — recent retrieval activity\n"
+            "• /log or /logs — recent retrieval activity\n"
             "• /unused — pending retrieval items\n"
-            "• /markused — mark item used\n"
-            "• /markunused — mark item unused\n"
+            "• /markused — show pending items to mark used\n"
+            "• /markunused — show accounts to toggle unused\n"
             "• /bulkdelete — delete by IDs or category\n"
             "• /export — export the full account list",
             parse_mode=ParseMode.HTML,
@@ -1203,9 +1444,13 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
         for row in items:
             parts.append(fmt_account_block(row["position"], row["username"], row["password"], row["category"]))
             keyboard.append([
-                InlineKeyboardButton(f"✅ Mark used", callback_data=f"itemused:{row['item_id']}:0"),
-                InlineKeyboardButton(f"♻️ Mark unused", callback_data=f"itemunused:{row['item_id']}:0"),
+                InlineKeyboardButton(f"✅ Mark used", callback_data=f"itemused:{row['item_id']}:0:{session_id}"),
+                InlineKeyboardButton(f"♻️ Mark unused", callback_data=f"itemunused:{row['item_id']}:0:{session_id}"),
             ])
+
+        keyboard.append([
+            InlineKeyboardButton("🗑️ Delete session", callback_data=f"delsessconfirm:{session_id}"),
+        ])
 
         await query.edit_message_text(
             "\n\n".join(parts),
@@ -1243,6 +1488,7 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
             return
 
         page = int(parts[2]) if len(parts) > 2 else 0
+        session_id = int(parts[3]) if len(parts) > 3 else None
         mark_used = query.data.startswith("itemused:")
         ok = set_item_used(item_id, mark_used)
         if not ok:
@@ -1255,6 +1501,36 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
             "used" if mark_used else "unused",
             query.from_user.id,
         )
+
+        if session_id is not None:
+            session = get_session(session_id)
+            items = get_session_items(session_id)
+            if not session or not items:
+                await query.edit_message_text("<b>⚠️ Session items updated.</b>", parse_mode=ParseMode.HTML)
+                return
+
+            parts = [
+                f"<b>📦 Session {session['id']}</b>",
+                f"• <b>Category:</b> <code>{esc(session['category'])}</code>",
+                f"• <b>Requested:</b> <code>{session['requested_amount']}</code>",
+                f"• <b>Retrieved:</b> <code>{session['retrieved_amount']}</code>",
+                f"• <b>Created:</b> <code>{esc(session['created_at'])}</code>",
+                "",
+            ]
+            keyboard = []
+            for row in items:
+                parts.append(fmt_account_block(row["position"], row["username"], row["password"], row["category"]))
+                keyboard.append([
+                    InlineKeyboardButton(f"✅ Mark used", callback_data=f"itemused:{row['item_id']}:0:{session_id}"),
+                    InlineKeyboardButton(f"♻️ Mark unused", callback_data=f"itemunused:{row['item_id']}:0:{session_id}"),
+                ])
+
+            await query.edit_message_text(
+                "\n\n".join(parts),
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode=ParseMode.HTML,
+            )
+            return
 
         text, reply_markup = build_pending_page(page)
         await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
@@ -1315,6 +1591,21 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
         await query.edit_message_text("<b>❌ Category deletion cancelled</b>", parse_mode=ParseMode.HTML)
         return
 
+    if query.data.startswith("delsessconfirm:"):
+        try:
+            session_id = int(query.data.split(":", 1)[1])
+        except ValueError:
+            await query.answer("Invalid session.")
+            return
+
+        ok = delete_session(session_id)
+        if ok:
+            logger.info("Deleted session %s by user %s", session_id, query.from_user.id)
+            await query.edit_message_text(f"<b>🗑️ Session deleted</b> <code>{session_id}</code>", parse_mode=ParseMode.HTML)
+        else:
+            await query.edit_message_text(f"<b>❌ Could not delete session</b> <code>{session_id}</code>", parse_mode=ParseMode.HTML)
+        return
+
     if query.data.startswith("bulkconfirm:"):
         raw = pending_bulk_delete_confirm.pop(query.from_user.id, None)
         if not raw:
@@ -1330,14 +1621,78 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
         return
 
     if query.data.startswith("listpage:"):
+        parts = query.data.split(":")
+        if len(parts) < 2 or parts[0] != "listpage":
+            await query.answer("Invalid page.")
+            return
+
         try:
-            page = int(query.data.split(":", 1)[1])
+            page = int(parts[1])
         except ValueError:
             await query.answer("Invalid page.")
             return
 
-        text, reply_markup = build_list_page(page)
+        filter_mode = parts[2] if len(parts) > 2 else "all"
+        try:
+            category_id = int(parts[3]) if len(parts) > 3 else 0
+        except ValueError:
+            category_id = 0
+        if filter_mode not in ("all", "used", "unused"):
+            filter_mode = "all"
+
+        text, reply_markup = build_list_page(page, filter_mode, category_id)
         await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        return
+
+    if query.data.startswith("csvconfirm:"):
+        user_id = query.from_user.id
+        data = pending_csv_extract.pop(user_id, None)
+        if not data:
+            await query.edit_message_text("<b>⏳ Confirmation expired</b>", parse_mode=ParseMode.HTML)
+            return
+
+        # perform the import using stored raw_text and detected headers
+        raw = data.get("raw_text", "")
+        user_header = data.get("detected_user_header")
+        password_header = data.get("detected_password_header")
+        category_id = data.get("category_id") or get_category_id_by_name("uncategorized")
+        reader = csv.DictReader(io.StringIO(raw))
+        extracted_rows = []
+        out = io.StringIO(newline="")
+        writer = csv.writer(out)
+        writer.writerow(["User ID / Email Address", "Password"])
+        for row in reader:
+            username = (row.get(user_header, "") or "").strip()
+            password = (row.get(password_header, "") or "").strip()
+            if username and password:
+                extracted_rows.append((username, password))
+            writer.writerow([username, password])
+
+        summary = add_accounts_bulk(extracted_rows, category_id)
+        from telegram import InputFile
+
+        bio = io.BytesIO(out.getvalue().encode("utf-8"))
+        bio.name = "extracted_accounts.csv"
+        bio.seek(0)
+        await query.edit_message_text(
+            "<b>🗄️ Importing...</b>", parse_mode=ParseMode.HTML
+        )
+        await query.message.reply_document(
+            document=InputFile(bio, filename=bio.name),
+            caption=(
+                f"<b>📄 Extracted CSV</b>\n"
+                f"• <b>Targeted columns:</b> <code>{esc(user_header)}</code> + <code>{esc(password_header)}</code>\n"
+                f"• <b>Stored:</b> <code>{summary['added']}</code> new account(s), "
+                f"skipped duplicates: <code>{summary['skipped']}</code>."
+            ),
+            parse_mode=ParseMode.HTML,
+        )
+        logger.info("CSV extracted for user %s: added=%s skipped=%s", user_id, summary['added'], summary['skipped'])
+        return
+
+    if query.data.startswith("csvcancel:"):
+        pending_csv_extract.pop(query.from_user.id, None)
+        await query.edit_message_text("<b>❌ CSV import cancelled</b>", parse_mode=ParseMode.HTML)
         return
 
     if query.data.startswith("accounttoggle:"):
@@ -1486,7 +1841,33 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    logger.exception("Unhandled exception: %s", context.error)
+    logger.exception("Unhandled exception", exc_info=context.error)
+
+    fallback_message = "<b>⚠️ Unexpected error occurred.</b>\nPlease try again later."
+    if isinstance(update, Update):
+        if update.effective_message:
+            await update.effective_message.reply_text(
+                fallback_message,
+                parse_mode=ParseMode.HTML,
+            )
+        elif update.callback_query:
+            await update.callback_query.answer(
+                "Unexpected error occurred. Please try again later.",
+                show_alert=True,
+            )
+
+    try:
+        if ALLOWED_USER_ID and context.application:
+            await context.application.bot.send_message(
+                chat_id=ALLOWED_USER_ID,
+                text=(
+                    f"⚠️ Bot error reported:\n"
+                    f"user={getattr(update, 'effective_user', None)}\n"
+                    f"error={context.error}"
+                ),
+            )
+    except Exception:
+        logger.exception("Failed to notify admin about an error")
 
 
 async def post_init(app: Application) -> None:
@@ -1502,12 +1883,17 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("add", add))
     app.add_handler(CommandHandler("bulkadd", bulkadd))
     app.add_handler(CommandHandler("getaccounts", getaccounts))
+    app.add_handler(CommandHandler("getid", getid))
+    app.add_handler(CommandHandler("log", logs))
+    app.add_handler(CommandHandler("logs", logs))
+    app.add_handler(CommandHandler("markused", unused))
+    app.add_handler(CommandHandler("markunused", accounts))
     app.add_handler(CommandHandler("addcategory", addcategory))
     app.add_handler(CommandHandler("deletecategory", deletecategory))
     app.add_handler(CommandHandler("categories", categories))
     app.add_handler(CommandHandler("search", search))
     app.add_handler(CommandHandler("delete", delete))
-    app.add_handler(CommandHandler("logs", logs))
+    app.add_handler(CommandHandler("delsession", delsession))
     app.add_handler(CommandHandler("unused", unused))
     app.add_handler(CommandHandler("accounts", accounts))
     app.add_handler(CommandHandler("list", list_accounts_cmd))
@@ -1515,10 +1901,11 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("extractcsv", extractcsv))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("export", export))
+    app.add_handler(MessageHandler(filters.COMMAND, unknown_command))
 
     app.add_handler(CallbackQueryHandler(handle_category_callback, pattern=r"^(addcat|bulkcat|getcat|csvcat):"))
     app.add_handler(CallbackQueryHandler(handle_main_menu, pattern=r"^menu:"))
-    app.add_handler(CallbackQueryHandler(handle_session_callback, pattern=r"^(sess|pending|itemused|itemunused|accountpage|accounttoggle|listpage|delconfirm|delcancel|delcatconfirm|delcatcancel|bulkconfirm|bulkcancel):"))
+    app.add_handler(CallbackQueryHandler(handle_session_callback, pattern=r"^(sess|pending|itemused|itemunused|accountpage|accounttoggle|listpage|delconfirm|delcancel|delcatconfirm|delcatcancel|delsessconfirm|bulkconfirm|bulkcancel|csvconfirm|csvcancel):"))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_csv_upload))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_error_handler(error_handler)
