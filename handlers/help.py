@@ -7,16 +7,18 @@ from core.help_content import HELP_MAIN_ADMIN, HELP_MAIN_SELLER, HELP_TOPICS
 
 TOPIC_EMOJIS = {
     "sell": "💰",
-    "preview": "📂",
-    "accounts": "➕",
+    "status": "📊",
+    "filter": "🔍",
     "search": "🔎",
+    "add": "➕",
+    "delete": "🗑️",
+    "preview": "📂",
     "categories": "📂",
     "sales": "📈",
-    "buyers": "👥",
     "inventory": "📦",
+    "buyers": "👥",
     "reports": "📊",
     "sellers": "👤",
-    "statuses": "📊",
     "settings": "⚙️",
 }
 
