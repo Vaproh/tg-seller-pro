@@ -1492,6 +1492,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_search_status(update, context, status_val)
         return
 
+    # ── Help topics ────────────────────────────────────────
+    if data.startswith("help:"):
+        if not await require_seller(update):
+            return
+        topic = data.split(":", 1)[1]
+        from handlers.help import handle_help_callback
+        await handle_help_callback(update, context, topic)
+        return
+
 
 async def _csv_show_preview(update, context, user_id, query):
     headers = state.get(user_id, "csv_headers", [])
