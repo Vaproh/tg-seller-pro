@@ -3,7 +3,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller, require_admin
 from core.state import state
-from core.format import esc
+from core.format import esc, _d, _truncate
 from core.keyboards import category_keyboard, confirm_keyboard
 from core.filters import (
     payment_status_keyboard, buyer_keyboard, parse_id_list,
