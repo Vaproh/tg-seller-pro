@@ -118,7 +118,7 @@ def get_sales(limit=20, offset=0, seller_id=None, buyer=None, status=None, tag=N
             FROM sales s
             JOIN accounts a ON a.id = s.account_id
             JOIN categories c ON c.id = a.category_id
-            JOIN sellers sl ON sl.id = s.seller_id
+            LEFT JOIN sellers sl ON sl.id = s.seller_id
             WHERE 1=1
         """
         params = []
@@ -220,7 +220,7 @@ def get_buyer_sales(buyer, seller_id=None, limit=20):
             FROM sales s
             JOIN accounts a ON a.id = s.account_id
             JOIN categories c ON c.id = a.category_id
-            JOIN sellers sl ON sl.id = s.seller_id
+            LEFT JOIN sellers sl ON sl.id = s.seller_id
             WHERE LOWER(s.buyer_name) = LOWER(?)
         """
         params = [buyer]
