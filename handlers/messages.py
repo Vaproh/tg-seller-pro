@@ -294,7 +294,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state.set(user_id, "bulksell_price", price)
         count = state.get(user_id, "bulksell_count")
         accounts = list_accounts(limit=count, status="available")
-        selected = [get_account_by_id(a["id"])["id"] if get_account_by_id(a["id"]) else a["id"] for a in accounts]
         selected = [a["id"] for a in accounts]
         state.set(user_id, "bulksell_selected", selected)
         state.set(user_id, "bulksell_stage", "payment")

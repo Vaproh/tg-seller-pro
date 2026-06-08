@@ -56,15 +56,8 @@ async def sell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def sell_select_account(update: Update, context: ContextTypes.DEFAULT_TYPE, account_id):
     user_id = update.effective_user.id
     query = update.callback_query
-    account = None
-    accounts, total = apply_list_filters(
-        state.get(user_id, "sell_filter"), limit=1000, offset=0
-    )
-    for a in accounts:
-        if _d(a)["id"] == account_id:
-            account = a
-            break
-    if not account:
+    account = get_account_by_id(account_id)
+    if not account or account["status"] != "available":
         await query.edit_message_text("🔍 Account not found or not available.")
         return
     state.set(user_id, "sell_account_id", account_id)

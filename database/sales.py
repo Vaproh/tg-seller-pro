@@ -61,6 +61,8 @@ def bulk_sell_accounts(ids, seller_id, buyer, price_each, payment_status="pendin
 
 
 def mark_payment(sale_id, status):
+    if status not in ("paid", "pending"):
+        return False
     conn = connect()
     try:
         sale = conn.execute(
@@ -75,6 +77,11 @@ def mark_payment(sale_id, status):
         if status == "paid":
             conn.execute(
                 "UPDATE accounts SET status = 'sold' WHERE id = ?",
+                (sale["account_id"],),
+            )
+        elif status == "pending":
+            conn.execute(
+                "UPDATE accounts SET status = 'pending_payment' WHERE id = ?",
                 (sale["account_id"],),
             )
         conn.commit()

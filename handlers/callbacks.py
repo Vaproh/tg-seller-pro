@@ -405,8 +405,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state.pop(user_id, "sell_filter", None)
         state.pop(user_id, "sell_page", None)
         state.pop(user_id, "sell_ids_input", None)
+        for key in ("bulksell_selected", "bulksell_buyer", "bulksell_price",
+                     "bulksell_payment_status", "bulksell_stage", "bulksell_filter",
+                     "bulksell_page", "bulksell_count"):
+            state.pop(user_id, key, None)
         if not account_id or not buyer:
-            await query.edit_message_text("❌ Sell cancelled — missing data.")
+            await query.edit_message_text("⚠️ Session expired. Please start over with /sell")
             return
         success, msg, sale_id = sell_account(
             account_id, seller["id"], buyer, price,
@@ -545,6 +549,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state.pop(user_id, "bulksell_stage", None)
         state.pop(user_id, "bulksell_filter", None)
         state.pop(user_id, "bulksell_page", None)
+        for key in ("sell_account_id", "sell_buyer", "sell_price", "sell_payment_status",
+                     "sell_stage", "sell_filter", "sell_page", "sell_ids_input"):
+            state.pop(user_id, key, None)
         if not selected or not buyer:
             await query.edit_message_text("❌ Bulk sell cancelled — no accounts selected.")
             return
@@ -1024,9 +1031,38 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("🔍 Sale not found.")
             return
         sd = _d(sale)
-        void_sale(sale_id)
-        await query.edit_message_text(f"✅ Sale #{sale_id} voided. Account returned to available stock.")
-        await notify_admin(context, fmt_void_notification(sale_id))
+        role = get_user_role(user_id)
+        if role != "admin" and sd.get("seller_user_id") != user_id:
+            await query.edit_message_text("⚠️ You can only void your own sales.")
+            return
+        state.set(user_id, "void_confirm", sale_id)
+        await query.edit_message_text(
+            f"⚠️ Void sale #{sale_id}? Account will return to available stock.",
+            reply_markup=confirm_keyboard(f"voidconfirm:{sale_id}", "voidcancel"),
+        )
+        return
+
+    if data.startswith("sellervoidconfirm:"):
+        if not await require_seller(update):
+            return
+        try:
+            sale_id = int(data.split(":")[1])
+        except ValueError:
+            return
+        sale = get_sale_by_id(sale_id)
+        if not sale:
+            await query.edit_message_text("🔍 Sale not found.")
+            return
+        sd = _d(sale)
+        role = get_user_role(user_id)
+        if role != "admin" and sd.get("seller_user_id") != user_id:
+            await query.edit_message_text("⚠️ You can only void your own sales.")
+            return
+        state.set(user_id, "void_confirm", sale_id)
+        await query.edit_message_text(
+            f"⚠️ Void sale #{sale_id}? Account will return to available stock.",
+            reply_markup=confirm_keyboard(f"voidconfirm:{sale_id}", "voidcancel"),
+        )
         return
 
     if data.startswith("marksalepending:"):

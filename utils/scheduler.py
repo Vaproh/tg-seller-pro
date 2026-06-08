@@ -16,7 +16,6 @@ scheduler = AsyncIOScheduler(timezone=config.TIMEZONE)
 def _build_daily_report():
     today = get_sales_summary(period="today")
     week = get_sales_summary(period="week")
-    total = get_sales_summary()
     available = count_accounts(status="available")
     sold = count_accounts(status="sold")
     pending = count_accounts(status="pending_payment")

@@ -31,11 +31,11 @@ def build_accounts_from_csv(headers, data, column_map):
         item = {
             "username": row[column_map["username"]] if "username" in column_map and column_map["username"] < len(row) else "",
             "password": row[column_map["password"]] if "password" in column_map and column_map["password"] < len(row) else "",
-            "email": row[column_map.get("email", -1)] if "email" in column_map and column_map["email"] < len(row) else None,
-            "email_password": row[column_map.get("email_password", -1)] if "email_password" in column_map and column_map["email_password"] < len(row) else None,
-            "has_2fa": _parse_bool(row[column_map.get("has_2fa", -1)]) if "has_2fa" in column_map and column_map["has_2fa"] < len(row) else False,
-            "is_verified": _parse_bool(row[column_map.get("is_verified", -1)]) if "is_verified" in column_map and column_map["is_verified"] < len(row) else False,
-            "notes": row[column_map.get("notes", -1)] if "notes" in column_map and column_map["notes"] < len(row) else None,
+            "email": row[column_map["email"]] if "email" in column_map and column_map["email"] < len(row) else None,
+            "email_password": row[column_map["email_password"]] if "email_password" in column_map and column_map["email_password"] < len(row) else None,
+            "has_2fa": _parse_bool(row[column_map["has_2fa"]]) if "has_2fa" in column_map and column_map["has_2fa"] < len(row) else False,
+            "is_verified": _parse_bool(row[column_map["is_verified"]]) if "is_verified" in column_map and column_map["is_verified"] < len(row) else False,
+            "notes": row[column_map["notes"]] if "notes" in column_map and column_map["notes"] < len(row) else None,
         }
         if item["username"] and item["password"]:
             accounts.append(item)

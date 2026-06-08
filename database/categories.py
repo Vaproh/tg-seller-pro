@@ -39,6 +39,13 @@ def delete_category(name):
         default = conn.execute(
             "SELECT id FROM categories WHERE LOWER(name) = 'uncategorized'"
         ).fetchone()
+        if not default:
+            conn.execute(
+                "INSERT OR IGNORE INTO categories (name, default_price) VALUES ('uncategorized', 0)"
+            )
+            default = conn.execute(
+                "SELECT id FROM categories WHERE LOWER(name) = 'uncategorized'"
+            ).fetchone()
         if default:
             conn.execute(
                 "UPDATE accounts SET category_id = ? WHERE category_id = ?",

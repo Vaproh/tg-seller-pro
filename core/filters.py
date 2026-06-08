@@ -168,7 +168,7 @@ def buyer_keyboard(buyer_names, callback_prefix="buypick"):
 def payment_status_keyboard(prefix="paystatus"):
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("✅ Mark as Sold", callback_data=f"{prefix}:sold"),
+            InlineKeyboardButton("🔴 Sold", callback_data=f"{prefix}:sold"),
         ],
         [
             InlineKeyboardButton("🟡 Pending Payment", callback_data=f"{prefix}:pending"),
@@ -184,7 +184,7 @@ def sale_actions_keyboard(sale_id):
         ],
         [
             InlineKeyboardButton("🟡 Mark Pending", callback_data=f"marksalepending:{sale_id}"),
-            InlineKeyboardButton("♻️ Void", callback_data=f"voidsale:{sale_id}"),
+            InlineKeyboardButton("♻️ Void", callback_data=f"sellervoidconfirm:{sale_id}"),
         ],
     ])
 
