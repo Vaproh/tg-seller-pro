@@ -358,8 +358,9 @@ async def _editsale_process_ids(update, context, raw_input):
         if draft_id:
             sale = get_sale_by_id(draft_id)
             if sale:
-                valid_sales.append(_d(sale))
-                created_drafts.append(id_str)
+                sd = _d(sale)
+                valid_sales.append(sd)
+                created_drafts.append((id_str, sd.get("sale_code", f"#{draft_id}")))
             else:
                 invalid_ids.append(id_str)
         else:
@@ -392,7 +393,8 @@ def _editsale_summary(sales, invalid_ids=None, created_drafts=None):
     else:
         text = "<b>✏️ Editing sales:</b>\n\n"
     if created_drafts:
-        text += f"\n📝 Created draft sale for account(s): {', '.join(str(i) for i in created_drafts)}"
+        for acct_id, code in created_drafts:
+            text += f"\n📝 Created {code} for account #{acct_id}"
     if invalid_ids:
         text += f"\n⚠️ Not found: {', '.join(invalid_ids)}"
     return text
@@ -413,7 +415,8 @@ def _editsale_summary_with_pending(sales, pending, invalid_ids=None, created_dra
             f"₹{price:.0f} | {ps_emoji} {esc(ps)}\n"
         )
     if created_drafts:
-        text += f"\n📝 Created draft sale for account(s): {', '.join(str(i) for i in created_drafts)}"
+        for acct_id, code in created_drafts:
+            text += f"\n📝 Created {code} for account #{acct_id}"
     if invalid_ids:
         text += f"\n⚠️ Not found: {', '.join(invalid_ids)}"
     return text

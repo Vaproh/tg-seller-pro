@@ -56,8 +56,9 @@ async def _editsale_process_ids_text(update, context, text):
                 if draft_id:
                     sale = get_sale_by_id(draft_id)
                     if sale:
-                        valid_sales.append(_d(sale))
-                        created_drafts.append(account_id)
+                        sd = _d(sale)
+                        valid_sales.append(sd)
+                        created_drafts.append((id_str, sd.get("sale_code", f"#{draft_id}")))
                     else:
                         invalid_ids.append(id_str)
                 else:
