@@ -22,6 +22,7 @@ HELP_MAIN_ADMIN = """<b>📖 Help — Admin</b>
 /marksold — Mark 🔴 sold
 /markunsold — Mark 🟢 available
 /markpendingpayment — Mark 🟡 waiting for money
+/editsale — Edit sale details
 
 <b>📂 Other</b>
 /preview — Show accounts to buyer
@@ -63,6 +64,7 @@ HELP_MAIN_SELLER = """<b>📖 Help — Seller</b>
 /marksold — Mark 🔴 sold
 /markunsold — Mark 🟢 available
 /markpendingpayment — Mark 🟡 waiting for money
+/editsale — Edit sale details
 
 <b>📂 Other</b>
 /preview — Show accounts to buyer
@@ -158,7 +160,7 @@ Marks an account as 🔴 sold.
 
 <b>How to use:</b>
 Type /marksold 123
-(replace 123 with account number)""",
+(or multiple: /marksold 1,2,3)""",
 
     "markunsold": """<b>🟢 /markunsold — Mark Available</b>
 
@@ -167,7 +169,7 @@ Makes an account available to sell again.
 
 <b>How to use:</b>
 Type /markunsold 123
-(replace 123 with account number)""",
+(or multiple: /markunsold 1,2,3)""",
 
     "markpendingpayment": """<b>🟡 /markpendingpayment — Mark Pending</b>
 
@@ -176,7 +178,7 @@ Marks account as waiting for payment.
 
 <b>How to use:</b>
 Type /markpendingpayment 123
-(replace 123 with account number)""",
+(or multiple: /markpendingpayment 1,2,3)""",
 
     "voidsale": """<b>♻️ /voidsale — Cancel Sale</b>
 
@@ -185,7 +187,28 @@ Deletes a sale. Account goes back to available.
 
 <b>How to use:</b>
 Type /voidsale 123
+(or multiple: /voidsale 1,2,3)
 (replace 123 with sale number)""",
+
+    "editsale": """<b>✏️ /editsale — Edit Sale Details</b>
+
+<b>What it does:</b>
+Lets you change buyer, price, payment status, or notes on existing sales.
+
+<b>How to use:</b>
+1. Type /editsale 123
+   (or multiple: /editsale 1,2,3)
+2. Tap a field to change:
+   • 👤 Buyer — type new name
+   • 💰 Price — type new price
+   • 📦 Status — pick paid/pending
+   • 📝 Notes — type new notes
+3. Tap ✅ Done when finished
+
+<b>Notes:</b>
+- Changes apply to all IDs at once
+- Status change auto-updates account status
+- Pending changes shown before applying""",
 
     "list": """<b>📋 /list — Browse Accounts</b>
 

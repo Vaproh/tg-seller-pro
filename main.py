@@ -72,6 +72,7 @@ async def post_init(application):
         BotCommand("marksold", "🔴 Mark account sold"),
         BotCommand("markunsold", "🟢 Mark account available"),
         BotCommand("markpendingpayment", "🟡 Mark pending payment"),
+        BotCommand("editsale", "✏️ Edit sale details"),
         BotCommand("preview", "📂 Preview for buyer"),
         BotCommand("categories", "📂 List categories"),
         BotCommand("addcategory", "➕ Create category (admin)"),
