@@ -272,26 +272,14 @@ async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not headers:
         await update.message.reply_text("Could not parse CSV.")
         return
-    mapping = detect_columns(headers)
-    if "username" not in mapping or "password" not in mapping:
-        await update.message.reply_text(
-            "Could not detect username/password columns.\n"
-            f"Detected headers: {', '.join(headers)}\n"
-            "Please ensure the CSV has 'username' and 'password' columns."
-        )
-        return
     state.set(user_id, "csv_headers", headers)
     state.set(user_id, "csv_data", data)
-    state.set(user_id, "csv_mapping", mapping)
-    state.set(user_id, "csv_stage", "preview")
-    accounts = build_accounts_from_csv(headers, data, mapping)
-    preview = accounts[:3]
-    text = f"<b>CSV Preview ({len(accounts)} accounts):</b>\n\n"
-    for acc in preview:
-        text += f"• {esc(acc['username'])} | {esc(acc['password'][:4])}***\n"
-    if len(accounts) > 3:
-        text += f"\n... and {len(accounts) - 3} more"
+    state.set(user_id, "csv_mapping", {})
+    state.set(user_id, "csv_stage", "map_username")
+    buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
     await update.message.reply_text(
-        text, parse_mode="HTML",
-        reply_markup=confirm_keyboard("csvconfirm", "csvcancel"),
+        f"<b>CSV Columns Detected:</b> {', '.join(headers)}\n\n"
+        "Which column is the <b>Reddit username</b>?",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(buttons),
     )

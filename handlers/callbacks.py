@@ -18,6 +18,7 @@ from database import (
     add_accounts_bulk, export_accounts_csv,
 )
 from database.sellers import get_seller_by_user_id
+from utils.csv_utils import build_accounts_from_csv
 from handlers.preview import handle_preview_category
 from handlers.search import handle_search_type
 from handlers.reports import handle_report_period
@@ -30,6 +31,46 @@ logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 10
 MAX_MSG_LEN = 4000
+
+
+async def _csv_show_preview(update, context, user_id, query):
+    headers = state.get(user_id, "csv_headers", [])
+    csv_data = state.get(user_id, "csv_data", [])
+    mapping = state.get(user_id, "csv_mapping", {})
+    state.set(user_id, "csv_stage", "preview")
+    accounts = build_accounts_from_csv(headers, csv_data, mapping)
+    if not accounts:
+        await query.edit_message_text("No valid accounts found in CSV with the selected mapping.")
+        return
+    preview = accounts[:3]
+    map_desc = []
+    if "username" in mapping:
+        map_desc.append(f"Username: {headers[mapping['username']]}")
+    if "password" in mapping:
+        map_desc.append(f"Password: {headers[mapping['password']]}")
+    if "email" in mapping:
+        map_desc.append(f"Email: {headers[mapping['email']]}")
+    if "email_password" in mapping:
+        map_desc.append(f"Email Pass: {headers[mapping['email_password']]}")
+    if "has_2fa" in mapping:
+        map_desc.append(f"2FA: {headers[mapping['has_2fa']]}")
+    if "is_verified" in mapping:
+        map_desc.append(f"Verified: {headers[mapping['is_verified']]}")
+    if "notes" in mapping:
+        map_desc.append(f"Notes: {headers[mapping['notes']]}")
+    text = f"<b>CSV Preview ({len(accounts)} accounts):</b>\n\n"
+    text += "<b>Mapping:</b> " + " | ".join(map_desc) + "\n\n"
+    for acc in preview:
+        text += f"• {esc(acc.get('username', ''))} | {esc(str(acc.get('password', ''))[:4])}***"
+        if acc.get("email"):
+            text += f" | {esc(acc['email'])}"
+        text += "\n"
+    if len(accounts) > 3:
+        text += f"\n... and {len(accounts) - 3} more"
+    await query.edit_message_text(
+        text, parse_mode="HTML",
+        reply_markup=confirm_keyboard("csvconfirm", "csvcancel"),
+    )
 
 
 def _truncate(text, limit=MAX_MSG_LEN):
@@ -610,6 +651,134 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("Upload a CSV file:")
         return
 
+    # ── CSV column mapping ────────────────────────────────
+    if data.startswith("csvcol:"):
+        if not require_admin(update):
+            return
+        col_idx = int(data.split(":")[1])
+        headers = state.get(user_id, "csv_headers", [])
+        mapping = state.get(user_id, "csv_mapping", {})
+        stage = state.get(user_id, "csv_stage")
+
+        if stage == "map_username":
+            mapping["username"] = col_idx
+            state.set(user_id, "csv_mapping", mapping)
+            state.set(user_id, "csv_stage", "map_password")
+            buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
+            await query.edit_message_text(
+                f"✅ Username: {esc(headers[col_idx])}\n\nWhich column is the <b>password</b>?",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(buttons),
+            )
+        elif stage == "map_password":
+            mapping["password"] = col_idx
+            state.set(user_id, "csv_mapping", mapping)
+            state.set(user_id, "csv_stage", "map_email")
+            buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
+            buttons.append([InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:email")])
+            await query.edit_message_text(
+                f"✅ Password: {esc(headers[col_idx])}\n\nWhich column is the <b>email</b>? (or skip)",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(buttons),
+            )
+        elif stage == "map_email":
+            mapping["email"] = col_idx
+            state.set(user_id, "csv_mapping", mapping)
+            state.set(user_id, "csv_stage", "map_email_password")
+            buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
+            buttons.append([InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:email_password")])
+            await query.edit_message_text(
+                f"✅ Email: {esc(headers[col_idx])}\n\nWhich column is the <b>email password</b>? (or skip)",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(buttons),
+            )
+        elif stage == "map_email_password":
+            mapping["email_password"] = col_idx
+            state.set(user_id, "csv_mapping", mapping)
+            state.set(user_id, "csv_stage", "map_2fa")
+            buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
+            buttons.append([InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:2fa")])
+            await query.edit_message_text(
+                f"✅ Email Password: {esc(headers[col_idx])}\n\nWhich column is the <b>2FA status</b>? (or skip)",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(buttons),
+            )
+        elif stage == "map_2fa":
+            mapping["has_2fa"] = col_idx
+            state.set(user_id, "csv_mapping", mapping)
+            state.set(user_id, "csv_stage", "map_verified")
+            buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
+            buttons.append([InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:verified")])
+            await query.edit_message_text(
+                f"✅ 2FA: {esc(headers[col_idx])}\n\nWhich column is the <b>verified status</b>? (or skip)",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(buttons),
+            )
+        elif stage == "map_verified":
+            mapping["is_verified"] = col_idx
+            state.set(user_id, "csv_mapping", mapping)
+            state.set(user_id, "csv_stage", "map_notes")
+            buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
+            buttons.append([InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:notes")])
+            await query.edit_message_text(
+                f"✅ Verified: {esc(headers[col_idx])}\n\nWhich column is <b>notes</b>? (or skip)",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(buttons),
+            )
+        elif stage == "map_notes":
+            mapping["notes"] = col_idx
+            state.set(user_id, "csv_mapping", mapping)
+            await _csv_show_preview(update, context, user_id, query)
+        return
+
+    if data.startswith("csvskip:"):
+        if not require_admin(update):
+            return
+        field = data.split(":")[1]
+        stage = state.get(user_id, "csv_stage")
+        mapping = state.get(user_id, "csv_mapping", {})
+        headers = state.get(user_id, "csv_headers", [])
+
+        if stage == "map_email":
+            state.set(user_id, "csv_stage", "map_email_password")
+            buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
+            buttons.append([InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:email_password")])
+            await query.edit_message_text(
+                "⏭️ Email skipped\n\nWhich column is the <b>email password</b>? (or skip)",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(buttons),
+            )
+        elif stage == "map_email_password":
+            state.set(user_id, "csv_stage", "map_2fa")
+            buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
+            buttons.append([InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:2fa")])
+            await query.edit_message_text(
+                "⏭️ Email password skipped\n\nWhich column is the <b>2FA status</b>? (or skip)",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(buttons),
+            )
+        elif stage == "map_2fa":
+            state.set(user_id, "csv_stage", "map_verified")
+            buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
+            buttons.append([InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:verified")])
+            await query.edit_message_text(
+                "⏭️ 2FA skipped\n\nWhich column is the <b>verified status</b>? (or skip)",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(buttons),
+            )
+        elif stage == "map_verified":
+            state.set(user_id, "csv_stage", "map_notes")
+            buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
+            buttons.append([InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:notes")])
+            await query.edit_message_text(
+                "⏭️ Verified skipped\n\nWhich column is <b>notes</b>? (or skip)",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(buttons),
+            )
+        elif stage == "map_notes":
+            await _csv_show_preview(update, context, user_id, query)
+        return
+
     # ── CSV confirm/cancel ─────────────────────────────────
     if data == "csvconfirm":
         if not require_admin(update):
@@ -634,11 +803,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "csvcancel":
-        state.pop(user_id, "csv_headers", None)
-        state.pop(user_id, "csv_data", None)
-        state.pop(user_id, "csv_mapping", None)
-        state.pop(user_id, "csv_category", None)
-        state.pop(user_id, "csv_stage", None)
+        for key in ("csv_headers", "csv_data", "csv_mapping", "csv_category", "csv_stage"):
+            state.pop(user_id, key, None)
         await query.edit_message_text("❌ CSV import cancelled.")
         return
 
