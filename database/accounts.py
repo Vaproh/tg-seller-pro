@@ -74,7 +74,8 @@ def get_account_by_id(account_id):
         conn.close()
 
 
-def list_accounts(limit=20, offset=0, used=None, category_id=None, status=None):
+def list_accounts(limit=20, offset=0, status=None, category_id=None,
+                  status_list=None, id_list=None):
     conn = connect()
     try:
         query = """
@@ -84,15 +85,20 @@ def list_accounts(limit=20, offset=0, used=None, category_id=None, status=None):
             WHERE 1=1
         """
         params = []
-        if used is not None:
-            query += " AND a.used = ?"
-            params.append(1 if used else 0)
-        if category_id is not None:
-            query += " AND a.category_id = ?"
-            params.append(category_id)
         if status is not None:
             query += " AND a.status = ?"
             params.append(status)
+        if status_list is not None:
+            placeholders = ",".join("?" * len(status_list))
+            query += f" AND a.status IN ({placeholders})"
+            params.extend(status_list)
+        if category_id is not None:
+            query += " AND a.category_id = ?"
+            params.append(category_id)
+        if id_list is not None:
+            placeholders = ",".join("?" * len(id_list))
+            query += f" AND a.id IN ({placeholders})"
+            params.extend(id_list)
         query += " ORDER BY a.id DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
         return conn.execute(query, params).fetchall()
@@ -100,29 +106,35 @@ def list_accounts(limit=20, offset=0, used=None, category_id=None, status=None):
         conn.close()
 
 
-def count_accounts(used=None, category_id=None, status=None):
+def count_accounts(status=None, category_id=None, status_list=None, id_list=None):
     conn = connect()
     try:
         query = "SELECT COUNT(*) as cnt FROM accounts WHERE 1=1"
         params = []
-        if used is not None:
-            query += " AND used = ?"
-            params.append(1 if used else 0)
-        if category_id is not None:
-            query += " AND category_id = ?"
-            params.append(category_id)
         if status is not None:
             query += " AND status = ?"
             params.append(status)
+        if status_list is not None:
+            placeholders = ",".join("?" * len(status_list))
+            query += f" AND status IN ({placeholders})"
+            params.extend(status_list)
+        if category_id is not None:
+            query += " AND category_id = ?"
+            params.append(category_id)
+        if id_list is not None:
+            placeholders = ",".join("?" * len(id_list))
+            query += f" AND id IN ({placeholders})"
+            params.extend(id_list)
         row = conn.execute(query, params).fetchone()
         return row["cnt"]
     finally:
         conn.close()
 
 
-def search_accounts(term=None, category=None, used=None, newest_first=True,
-                    username=None, password=None, status=None, notes_term=None,
-                    buyer=None, tag=None):
+def search_accounts(term=None, category=None, status=None, newest_first=True,
+                    username=None, password=None, notes_term=None,
+                    buyer=None, tag=None, category_id=None, status_list=None,
+                    id_list=None):
     conn = connect()
     try:
         query = """
@@ -145,46 +157,35 @@ def search_accounts(term=None, category=None, used=None, newest_first=True,
         if category:
             query += " AND LOWER(c.name) = LOWER(?)"
             params.append(category)
-        if used is not None:
-            query += " AND a.used = ?"
-            params.append(1 if used else 0)
+        if category_id is not None:
+            query += " AND a.category_id = ?"
+            params.append(category_id)
         if status:
             query += " AND a.status = ?"
             params.append(status)
+        if status_list is not None:
+            placeholders = ",".join("?" * len(status_list))
+            query += f" AND a.status IN ({placeholders})"
+            params.extend(status_list)
+        if id_list is not None:
+            placeholders = ",".join("?" * len(id_list))
+            query += f" AND a.id IN ({placeholders})"
+            params.extend(id_list)
         if notes_term:
             query += " AND a.notes LIKE ?"
             params.append(f"%{notes_term}%")
         if buyer or tag:
-            query = """
-                SELECT a.*, c.name as category_name
-                FROM accounts a
-                JOIN categories c ON c.id = a.category_id
-                JOIN sales s ON s.account_id = a.id
-                WHERE 1=1
-            """
-            params = []
+            query += " AND a.id IN (SELECT s.account_id FROM sales s WHERE 1=1"
             if buyer:
                 query += " AND LOWER(s.buyer_name) = LOWER(?)"
                 params.append(buyer)
             if tag:
                 query += " AND s.tags LIKE ?"
                 params.append(f"%{tag}%")
+            query += ")"
         order = "DESC" if newest_first else "ASC"
         query += f" ORDER BY a.id {order}"
         return conn.execute(query, params).fetchall()
-    finally:
-        conn.close()
-
-
-def set_account_sold(account_id, sold):
-    conn = connect()
-    try:
-        cursor = conn.execute(
-            "UPDATE accounts SET used = ?, used_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END WHERE id = ?",
-            (1 if sold else 0, 1 if sold else 0, account_id),
-        )
-        conn.commit()
-        return cursor.rowcount > 0
     finally:
         conn.close()
 
@@ -279,14 +280,14 @@ def get_accounts_for_category(category_id, limit=5):
         conn.close()
 
 
-def get_unused_accounts_for_category(category_id, limit=5):
+def get_available_accounts_for_category(category_id, limit=5):
     conn = connect()
     try:
         return conn.execute(
             """SELECT a.*, c.name as category_name
                FROM accounts a
                JOIN categories c ON c.id = a.category_id
-               WHERE a.category_id = ? AND a.status = 'active'
+               WHERE a.category_id = ? AND a.status = 'available'
                ORDER BY a.id DESC LIMIT ?""",
             (category_id, limit),
         ).fetchall()
@@ -300,7 +301,7 @@ def export_accounts_csv():
         rows = conn.execute(
             """SELECT a.id, a.username, a.password, a.email, a.email_password,
                       a.has_2fa, a.is_verified, c.name as category, a.notes,
-                      a.status, a.used, a.used_at, a.created_at
+                      a.status, a.created_at
                FROM accounts a
                JOIN categories c ON c.id = a.category_id
                ORDER BY a.id"""
@@ -310,7 +311,7 @@ def export_accounts_csv():
         writer.writerow([
             "id", "username", "password", "email", "email_password",
             "has_2fa", "is_verified", "category", "notes",
-            "status", "used", "used_at", "created_at"
+            "status", "created_at"
         ])
         for row in rows:
             writer.writerow([
@@ -318,8 +319,7 @@ def export_accounts_csv():
                 row["email"], row["email_password"],
                 row["has_2fa"], row["is_verified"],
                 row["category"], row["notes"],
-                row["status"], row["used"],
-                row["used_at"], row["created_at"],
+                row["status"], row["created_at"],
             ])
         return output.getvalue().encode("utf-8")
     finally:

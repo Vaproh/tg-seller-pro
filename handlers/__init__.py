@@ -8,7 +8,11 @@ from handlers.accounts import (
     add_cmd, add_bulk_cmd, getid_cmd, delete_cmd,
     bulkdelete_cmd, extractcsv_cmd, list_cmd,
 )
-from handlers.sell import sell_cmd, bulksell_cmd, sales_cmd, sale_cmd, markpaid_cmd, voidsale_cmd
+from handlers.sell import (
+    sell_cmd, bulksell_cmd, sales_cmd, sale_cmd,
+    markpaid_cmd, voidsale_cmd,
+    marksold_cmd, markunsold_cmd, markpendingpayment_cmd,
+)
 from handlers.preview import preview_cmd
 from handlers.search import search_cmd
 from handlers.categories import categories_cmd, addcategory_cmd, deletecategory_cmd
@@ -45,6 +49,9 @@ def register_handlers(application: Application):
     application.add_handler(CommandHandler("sale", sale_cmd))
     application.add_handler(CommandHandler("markpaid", markpaid_cmd))
     application.add_handler(CommandHandler("voidsale", voidsale_cmd))
+    application.add_handler(CommandHandler("marksold", marksold_cmd))
+    application.add_handler(CommandHandler("markunsold", markunsold_cmd))
+    application.add_handler(CommandHandler("markpendingpayment", markpendingpayment_cmd))
 
     application.add_handler(CommandHandler("preview", preview_cmd))
     application.add_handler(CommandHandler("search", search_cmd))

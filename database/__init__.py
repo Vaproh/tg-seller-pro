@@ -6,15 +6,15 @@ from database.categories import (
 from database.accounts import (
     add_account, add_accounts_bulk, get_account_by_id,
     list_accounts, count_accounts, search_accounts,
-    set_account_sold, set_account_status, update_account_notes,
+    set_account_status, update_account_notes,
     update_account_optional_fields, delete_account, delete_accounts_by_ids,
     delete_accounts_in_category, get_accounts_for_category,
-    get_unused_accounts_for_category, export_accounts_csv,
+    get_available_accounts_for_category, export_accounts_csv,
 )
 from database.sales import (
     sell_account, bulk_sell_accounts, mark_payment,
     get_sales, count_sales, get_sale_by_id, get_buyers,
-    get_buyer_sales, get_sales_summary, void_sale,
+    get_buyer_names, get_buyer_sales, get_sales_summary, void_sale,
 )
 from database.sellers import (
     add_seller, remove_seller, list_sellers,
@@ -33,13 +33,13 @@ __all__ = [
     "get_category_name", "get_category_id_by_name", "update_category_price",
     "add_account", "add_accounts_bulk", "get_account_by_id",
     "list_accounts", "count_accounts", "search_accounts",
-    "set_account_sold", "set_account_status", "update_account_notes",
+    "set_account_status", "update_account_notes",
     "update_account_optional_fields", "delete_account", "delete_accounts_by_ids",
     "delete_accounts_in_category", "get_accounts_for_category",
-    "get_unused_accounts_for_category", "export_accounts_csv",
+    "get_available_accounts_for_category", "export_accounts_csv",
     "sell_account", "bulk_sell_accounts", "mark_payment",
     "get_sales", "count_sales", "get_sale_by_id", "get_buyers",
-    "get_buyer_sales", "get_sales_summary", "void_sale",
+    "get_buyer_names", "get_buyer_sales", "get_sales_summary", "void_sale",
     "add_seller", "remove_seller", "list_sellers",
     "get_seller_by_user_id", "get_seller_by_id", "is_seller_active",
     "create_retrieval_session", "add_retrieval_item",

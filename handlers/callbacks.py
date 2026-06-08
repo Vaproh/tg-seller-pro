@@ -5,22 +5,33 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller, require_admin, get_user_role
 from core.state import state
-from core.format import esc, fmt_compact
+from core.format import esc, _d, fmt_account_block, fmt_receipt, fmt_sale_block
 from core.keyboards import (
     main_menu_keyboard, add_menu_keyboard, settings_keyboard,
-    confirm_keyboard, pagination_keyboard, category_keyboard,
-    yes_no_keyboard, sell_accounts_keyboard,
+    confirm_keyboard, category_keyboard, yes_no_keyboard,
+    report_period_keyboard, sale_actions_keyboard,
+)
+from core.filters import (
+    filter_page_keyboard, apply_list_filters, count_from_filter,
+    fmt_account_list_page, parse_filter_state, build_filter_state,
+    parse_id_list, buyer_keyboard, payment_status_keyboard,
+    fmt_account_list_line, category_keyboard_with_all, PAGE_SIZE,
 )
 from database import (
     list_categories, get_category_name, delete_account, delete_category,
     list_accounts, count_accounts, get_account_by_id, get_category_id_by_name,
     sell_account, mark_payment, void_sale, get_sale_by_id, get_sales, count_sales,
-    add_accounts_bulk, export_accounts_csv,
+    add_accounts_bulk, export_accounts_csv, set_account_status,
+    get_buyer_names, get_buyer_sales, get_seller_by_user_id,
+    get_available_accounts_for_category,
 )
-from database.sellers import get_seller_by_user_id
+from database.sales import bulk_sell_accounts, get_sales_summary
 from utils.csv_utils import build_accounts_from_csv
 from handlers.preview import handle_preview_category
-from handlers.search import handle_search_type
+from handlers.search import (
+    handle_search_type, handle_search_value,
+    handle_search_category, handle_search_status,
+)
 from handlers.reports import handle_report_period
 from utils.notifications import (
     notify_admin, fmt_payment_notification, fmt_void_notification,
@@ -29,48 +40,7 @@ import config
 
 logger = logging.getLogger(__name__)
 
-PAGE_SIZE = 10
 MAX_MSG_LEN = 4000
-
-
-async def _csv_show_preview(update, context, user_id, query):
-    headers = state.get(user_id, "csv_headers", [])
-    csv_data = state.get(user_id, "csv_data", [])
-    mapping = state.get(user_id, "csv_mapping", {})
-    state.set(user_id, "csv_stage", "preview")
-    accounts = build_accounts_from_csv(headers, csv_data, mapping)
-    if not accounts:
-        await query.edit_message_text("📭 No valid accounts found in CSV with the selected mapping.")
-        return
-    preview = accounts[:3]
-    map_desc = []
-    if "username" in mapping:
-        map_desc.append(f"Username: {headers[mapping['username']]}")
-    if "password" in mapping:
-        map_desc.append(f"Password: {headers[mapping['password']]}")
-    if "email" in mapping:
-        map_desc.append(f"Email: {headers[mapping['email']]}")
-    if "email_password" in mapping:
-        map_desc.append(f"Email Pass: {headers[mapping['email_password']]}")
-    if "has_2fa" in mapping:
-        map_desc.append(f"2FA: {headers[mapping['has_2fa']]}")
-    if "is_verified" in mapping:
-        map_desc.append(f"Verified: {headers[mapping['is_verified']]}")
-    if "notes" in mapping:
-        map_desc.append(f"Notes: {headers[mapping['notes']]}")
-    text = f"<b>CSV Preview ({len(accounts)} accounts):</b>\n\n"
-    text += "<b>Mapping:</b> " + " | ".join(map_desc) + "\n\n"
-    for acc in preview:
-        text += f"• {esc(acc.get('username', ''))} | {esc(str(acc.get('password', ''))[:4])}***"
-        if acc.get("email"):
-            text += f" | {esc(acc['email'])}"
-        text += "\n"
-    if len(accounts) > 3:
-        text += f"\n... and {len(accounts) - 3} more"
-    await query.edit_message_text(
-        text, parse_mode="HTML",
-        reply_markup=confirm_keyboard("csvconfirm", "csvcancel"),
-    )
 
 
 def _truncate(text, limit=MAX_MSG_LEN):
@@ -226,15 +196,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "addcancel":
         if not await require_admin(update):
             return
-        state.pop(user_id, "add_username", None)
-        state.pop(user_id, "add_password", None)
-        state.pop(user_id, "add_email", None)
-        state.pop(user_id, "add_email_password", None)
-        state.pop(user_id, "add_2fa", None)
-        state.pop(user_id, "add_verified", None)
-        state.pop(user_id, "add_notes", None)
-        state.pop(user_id, "add_category_id", None)
-        state.pop(user_id, "add_stage", None)
+        for key in ("add_username", "add_password", "add_email", "add_email_password",
+                     "add_2fa", "add_verified", "add_notes", "add_category_id", "add_stage"):
+            state.pop(user_id, key, None)
         await query.edit_message_text("❌ Account add cancelled.")
         return
 
@@ -247,39 +211,182 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("📂 Select a category:", reply_markup=kb)
         return
 
+    if data.startswith("previewcat:"):
+        cat_id_str = data.split(":", 1)[1]
+        await handle_preview_category(update, context, cat_id_str)
+        return
+
     # ── Sell flow ──────────────────────────────────────────
     if data == "menu:sell":
         if not await require_seller(update):
             return
         seller = get_seller_by_user_id(user_id)
         if not seller:
-            await query.edit_message_text("You are not registered as a seller.")
+            await query.edit_message_text("⚠️ You are not registered as a seller.")
             return
-        accounts = list_accounts(limit=20, status="active")
-        if not accounts:
-            await query.edit_message_text("📭 No available accounts to sell.")
-            return
-        state.set(user_id, "sell_stage", "select_account")
-        kb = sell_accounts_keyboard(accounts, "sellselect")
-        await query.edit_message_text("💰 Select an account to sell:", reply_markup=kb)
+        state.set(user_id, "sell_filter", None)
+        state.set(user_id, "sell_page", 1)
+        accounts, total = apply_list_filters(None, limit=PAGE_SIZE, offset=0)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        text = fmt_account_list_page(accounts, 1, total_pages, title="Available Accounts to Sell")
+        kb = filter_page_keyboard(
+            "sellfilter", 1, total_pages,
+            include_available=True, include_sold=False, include_pending=False,
+            include_all=False, include_ids=True,
+        )
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return
 
-    if data.startswith("sellselect:") or data.startswith("quick sell:"):
+    # ── Sell filter callbacks ──────────────────────────────
+    if data.startswith("sellfilter:") and not data.startswith("sellfiltercat") and not data.startswith("sellfilterids"):
         if not await require_seller(update):
             return
-        parts = data.split(":")
+        f = data.split(":", 1)[1]
+        if f == "all":
+            state.set(user_id, "sell_filter", None)
+        else:
+            state.set(user_id, "sell_filter", f"status:{f}")
+        state.set(user_id, "sell_page", 1)
+        filter_str = state.get(user_id, "sell_filter")
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        text = fmt_account_list_page(accounts, 1, total_pages, title="Available Accounts to Sell")
+        kb = filter_page_keyboard(
+            "sellfilter", 1, total_pages,
+            include_available=True, include_sold=False, include_pending=False,
+            include_all=False, include_ids=True,
+        )
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return
+
+    if data == "sellfiltercat":
+        if not await require_seller(update):
+            return
+        kb = category_keyboard("sellfiltercatpick")
+        if not kb:
+            await query.edit_message_text("📭 No categories found.")
+            return
+        await query.edit_message_text("📂 Select a category:", reply_markup=kb)
+        return
+
+    if data.startswith("sellfiltercatpick:"):
+        if not await require_seller(update):
+            return
+        cat_id_str = data.split(":", 1)[1]
         try:
-            account_id = int(parts[1])
+            cat_id = int(cat_id_str)
         except ValueError:
             return
+        state.set(user_id, "sell_filter", f"cat:{cat_id}")
+        state.set(user_id, "sell_page", 1)
+        filter_str = state.get(user_id, "sell_filter")
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        text = fmt_account_list_page(accounts, 1, total_pages, title="Available Accounts to Sell")
+        kb = filter_page_keyboard(
+            "sellfilter", 1, total_pages,
+            include_available=True, include_sold=False, include_pending=False,
+            include_all=False, include_ids=True,
+        )
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return
+
+    if data == "sellfilterids":
+        if not await require_seller(update):
+            return
+        state.set(user_id, "sell_ids_input", True)
+        await query.edit_message_text("🔢 Enter account IDs (comma-separated):")
+        return
+
+    if data.startswith("sellfilterpage:"):
+        if not await require_seller(update):
+            return
+        try:
+            page = int(data.split(":")[1])
+        except ValueError:
+            return
+        state.set(user_id, "sell_page", page)
+        filter_str = state.get(user_id, "sell_filter")
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        page = max(1, min(page, total_pages))
+        text = fmt_account_list_page(accounts, page, total_pages, title="Available Accounts to Sell")
+        kb = filter_page_keyboard(
+            "sellfilter", page, total_pages,
+            include_available=True, include_sold=False, include_pending=False,
+            include_all=False, include_ids=True,
+        )
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return
+
+    # ── Sell account selection ─────────────────────────────
+    if data.startswith("sellpick:"):
+        if not await require_seller(update):
+            return
+        try:
+            account_id = int(data.split(":")[1])
+        except ValueError:
+            return
+        from handlers.sell import sell_select_account
+        await sell_select_account(update, context, account_id)
+        return
+
+    if data.startswith("quicksell:"):
+        if not await require_seller(update):
+            return
+        try:
+            account_id = int(data.split(":")[1])
+        except ValueError:
+            return
+        from handlers.sell import sell_select_account
+        state.set(user_id, "sell_filter", None)
+        await sell_select_account(update, context, account_id)
+        return
+
+    # ── Buyer selection ────────────────────────────────────
+    if data.startswith("buypick:"):
+        if not await require_seller(update):
+            return
+        buyer_name = data.split(":", 1)[1]
+        if buyer_name == "new":
+            state.set(user_id, "sell_stage", "buyer")
+            await query.edit_message_text("👤 Enter buyer name:")
+            return
+        state.set(user_id, "sell_buyer", buyer_name)
+        state.set(user_id, "sell_stage", "price")
+        await query.edit_message_text(
+            f"👤 Buyer: {esc(buyer_name)}\n\n💰 Enter price (₹):"
+        )
+        return
+
+    # ── Payment status choice ──────────────────────────────
+    if data.startswith("paystatus:"):
+        if not await require_seller(update):
+            return
+        payment_status = data.split(":", 1)[1]
+        state.set(user_id, "sell_payment_status", payment_status)
+        account_id = state.get(user_id, "sell_account_id")
+        buyer = state.get(user_id, "sell_buyer")
+        price = state.get(user_id, "sell_price")
         account = get_account_by_id(account_id)
         if not account:
             await query.edit_message_text("🔍 Account not found.")
             return
-        state.set(user_id, "sell_account_id", account_id)
-        state.set(user_id, "sell_stage", "buyer")
+        a = _d(account)
+        ps_label = "🟡 Pending Payment" if payment_status == "pending" else "🔴 Sold"
+        text_preview = (
+            f"<b>Confirm Sale:</b>\n\n"
+            f"Account: #{a.get('id', '')} — {esc(a.get('username'))}\n"
+            f"Buyer: {esc(buyer)}\n"
+            f"Price: ₹{price:.0f}\n"
+            f"Status: {ps_label}\n\n"
+            f"✅ Confirm?"
+        )
+        state.set(user_id, "sell_stage", "confirm")
         await query.edit_message_text(
-            f"Account: {esc(account['username'])}\n\n👤 Enter buyer name:"
+            text_preview,
+            parse_mode="HTML",
+            reply_markup=confirm_keyboard("sellconfirm", "sellcancel"),
         )
         return
 
@@ -293,18 +400,24 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         account_id = state.pop(user_id, "sell_account_id")
         buyer = state.pop(user_id, "sell_buyer")
         price = state.pop(user_id, "sell_price", 0)
-        tags = state.pop(user_id, "sell_tags")
+        payment_status = state.pop(user_id, "sell_payment_status", "pending")
         state.pop(user_id, "sell_stage", None)
+        state.pop(user_id, "sell_filter", None)
+        state.pop(user_id, "sell_page", None)
+        state.pop(user_id, "sell_ids_input", None)
         if not account_id or not buyer:
             await query.edit_message_text("❌ Sell cancelled — missing data.")
             return
-        success, msg, sale_id = sell_account(account_id, seller["id"], buyer, price, tags=tags)
+        success, msg, sale_id = sell_account(
+            account_id, seller["id"], buyer, price,
+            payment_status=payment_status,
+        )
         if success:
-            from core.format import fmt_receipt
             sale = get_sale_by_id(sale_id)
             receipt = fmt_receipt(sale)
             await query.edit_message_text(receipt, parse_mode="HTML")
-            await notify_admin(context, f"💰 New sale! #{sale_id} — {buyer} — ₹{price:.0f} — by {seller['name']}")
+            status_label = "pending payment" if payment_status == "pending" else "sold"
+            await notify_admin(context, f"💰 New sale! #{sale_id} — {buyer} — ₹{price:.0f} ({status_label}) — by {seller['name']}")
             if price >= config.HIGH_VALUE_THRESHOLD:
                 await notify_admin(context, f"🔥 High-value sale! #{sale_id} — ₹{price:.0f} from {buyer} — by {seller['name']}")
         else:
@@ -312,21 +425,41 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "sellcancel":
-        state.pop(user_id, "sell_account_id", None)
-        state.pop(user_id, "sell_buyer", None)
-        state.pop(user_id, "sell_price", None)
-        state.pop(user_id, "sell_tags", None)
-        state.pop(user_id, "sell_stage", None)
+        for key in ("sell_account_id", "sell_buyer", "sell_price", "sell_payment_status",
+                     "sell_stage", "sell_filter", "sell_page", "sell_ids_input"):
+            state.pop(user_id, key, None)
         await query.edit_message_text("❌ Sale cancelled.")
         return
 
     # ── Bulk sell ──────────────────────────────────────────
-    if data.startswith("bulksellselect:"):
+    if data.startswith("bulksellmode:"):
         if not await require_seller(update):
             return
-        parts = data.split(":")
+        mode = data.split(":", 1)[1]
+        if mode == "select":
+            state.set(user_id, "bulksell_filter", None)
+            state.set(user_id, "bulksell_selected", [])
+            state.set(user_id, "bulksell_page", 1)
+            accounts, total = apply_list_filters(None, limit=PAGE_SIZE, offset=0)
+            total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+            text = f"<b>💰 Bulk Sell — Select accounts</b>\n\n"
+            for acc in accounts:
+                text += fmt_account_list_line(acc) + "\n"
+            kb = _bulksell_select_keyboard([], accounts, 1, total_pages)
+            await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        elif mode == "number":
+            state.set(user_id, "bulksell_stage", "number")
+            available = count_accounts(status="available")
+            await query.edit_message_text(
+                f"🔢 How many accounts to sell? (available: {available})"
+            )
+        return
+
+    if data.startswith("bulkseltoggle:"):
+        if not await require_seller(update):
+            return
         try:
-            account_id = int(parts[1])
+            account_id = int(data.split(":")[1])
         except ValueError:
             return
         selected = state.get(user_id, "bulksell_selected", [])
@@ -335,33 +468,73 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             selected.append(account_id)
         state.set(user_id, "bulksell_selected", selected)
-        accounts = list_accounts(limit=20, status="active")
-        buttons = []
+        filter_str = state.get(user_id, "bulksell_filter")
+        page = state.get(user_id, "bulksell_page", 1)
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        text = f"<b>💰 Bulk Sell — {len(selected)} selected</b>\n\n"
         for acc in accounts:
-            mark = "✅" if acc["id"] in selected else "  "
-            buttons.append([
-                InlineKeyboardButton(
-                    f"{mark} #{acc['id']} | {acc['username']}",
-                    callback_data=f"bulksellselect:{acc['id']}",
-                )
-            ])
-        buttons.append([
-            InlineKeyboardButton(
-                f"✅ Confirm ({len(selected)} selected)",
-                callback_data="bulksellconfirm",
-            ),
-            InlineKeyboardButton("❌ Cancel", callback_data="bulksellcancel"),
-        ])
-        kb = InlineKeyboardMarkup(buttons)
-        await query.edit_message_text(
-            f"Selected: {len(selected)} accounts\nTap to toggle, then confirm:",
-            reply_markup=kb,
-        )
+            text += fmt_account_list_line(acc) + "\n"
+        kb = _bulksell_select_keyboard(selected, accounts, page, total_pages)
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return
 
-    if data == "bulksellconfirm":
+    if data.startswith("bulkselpage:"):
         if not await require_seller(update):
             return
+        try:
+            page = int(data.split(":")[1])
+        except ValueError:
+            return
+        state.set(user_id, "bulksell_page", page)
+        filter_str = state.get(user_id, "bulksell_filter")
+        selected = state.get(user_id, "bulksell_selected", [])
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        text = f"<b>💰 Bulk Sell — {len(selected)} selected</b>\n\n"
+        for acc in accounts:
+            text += fmt_account_list_line(acc) + "\n"
+        kb = _bulksell_select_keyboard(selected, accounts, page, total_pages)
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return
+
+    if data == "bulkselldone":
+        if not await require_seller(update):
+            return
+        selected = state.get(user_id, "bulksell_selected", [])
+        if not selected:
+            await query.edit_message_text("⚠️ No accounts selected.")
+            return
+        state.set(user_id, "bulksell_stage", "buyer")
+        buyer_names = get_buyer_names()
+        if buyer_names:
+            kb = buyer_keyboard(buyer_names, "bulkbuypick")
+            await query.edit_message_text(
+                f"👤 {len(selected)} accounts selected.\nSelect buyer:",
+                reply_markup=kb,
+            )
+        else:
+            await query.edit_message_text(f"👤 {len(selected)} accounts selected.\nEnter buyer name:")
+        return
+
+    if data.startswith("bulkbuypick:"):
+        if not await require_seller(update):
+            return
+        buyer_name = data.split(":", 1)[1]
+        if buyer_name == "new":
+            state.set(user_id, "bulksell_stage", "buyer")
+            await query.edit_message_text("👤 Enter buyer name:")
+            return
+        state.set(user_id, "bulksell_buyer", buyer_name)
+        state.set(user_id, "bulksell_stage", "price")
+        await query.edit_message_text(f"👤 Buyer: {esc(buyer_name)}\n\n💰 Enter price per account (₹):")
+        return
+
+    if data.startswith("bulksellpaystatus:"):
+        if not await require_seller(update):
+            return
+        payment_status = data.split(":", 1)[1]
+        state.set(user_id, "bulksell_payment_status", payment_status)
         seller = get_seller_by_user_id(user_id)
         if not seller:
             await query.edit_message_text("⚠️ You are not registered as a seller.")
@@ -370,22 +543,26 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         buyer = state.pop(user_id, "bulksell_buyer")
         price = state.pop(user_id, "bulksell_price", 0)
         state.pop(user_id, "bulksell_stage", None)
+        state.pop(user_id, "bulksell_filter", None)
+        state.pop(user_id, "bulksell_page", None)
         if not selected or not buyer:
             await query.edit_message_text("❌ Bulk sell cancelled — no accounts selected.")
             return
-        from database import bulk_sell_accounts
-        result = bulk_sell_accounts(selected, seller["id"], buyer, price)
-        await query.edit_message_text(
-            f"✅ Bulk sell complete: {result['added']} sold, {result['skipped']} skipped"
+        result = bulk_sell_accounts(
+            selected, seller["id"], buyer, price,
+            payment_status=payment_status,
         )
-        await notify_admin(context, f"💰 Bulk sell: {result['added']} accounts to {buyer} — ₹{price:.0f} each — by {seller['name']}")
+        status_label = "pending payment" if payment_status == "pending" else "sold"
+        await query.edit_message_text(
+            f"✅ Bulk sell complete: {result['added']} {status_label}, {result['skipped']} skipped"
+        )
+        await notify_admin(context, f"💰 Bulk sell: {result['added']} accounts to {buyer} — ₹{price:.0f} each ({status_label}) — by {seller['name']}")
         return
 
     if data == "bulksellcancel":
-        state.pop(user_id, "bulksell_selected", None)
-        state.pop(user_id, "bulksell_buyer", None)
-        state.pop(user_id, "bulksell_price", None)
-        state.pop(user_id, "bulksell_stage", None)
+        for key in ("bulksell_selected", "bulksell_buyer", "bulksell_price",
+                     "bulksell_payment_status", "bulksell_stage", "bulksell_filter", "bulksell_page"):
+            state.pop(user_id, key, None)
         await query.edit_message_text("❌ Bulk sell cancelled.")
         return
 
@@ -404,25 +581,54 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
         sales = get_sales(limit=PAGE_SIZE, offset=0, seller_id=seller_id)
-        text = f"<b>📈 Sales (1/{total_pages})</b>\n\n"
-        for s in sales:
-            text += (
-                f"• #{s['id']} | {esc(s['buyer_name'])} | "
-                f"₹{s['price']:.0f} | {esc(s['payment_status'])} | "
-                f"{esc(dict(s).get('seller_name', '—'))}\n"
-            )
-        filter_buttons = [
-            InlineKeyboardButton("All", callback_data="salesfilter:all"),
-            InlineKeyboardButton("Pending", callback_data="salesfilter:pending"),
-            InlineKeyboardButton("Paid", callback_data="salesfilter:paid"),
-        ]
-        nav_buttons = []
-        if 1 > 1:
-            nav_buttons.append(InlineKeyboardButton("⬅️", callback_data="salespage:0"))
-        nav_buttons.append(InlineKeyboardButton(f"1/{total_pages}", callback_data="noop"))
-        if total_pages > 1:
-            nav_buttons.append(InlineKeyboardButton("➡️", callback_data="salespage:2"))
-        kb = InlineKeyboardMarkup([filter_buttons, nav_buttons])
+        from handlers.sell import _fmt_sales_page, _sales_keyboard
+        text = _fmt_sales_page(sales, 1, total_pages)
+        kb = _sales_keyboard(1, total_pages)
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return
+
+    if data.startswith("salesfilter:") and not data.startswith("salesfilterpage:"):
+        if not await require_seller(update):
+            return
+        f = data.split(":", 1)[1]
+        state.set(user_id, "sales_filter", f)
+        state.set(user_id, "sales_page", 1)
+        role = get_user_role(user_id)
+        seller = get_seller_by_user_id(user_id) if role != "admin" else None
+        seller_id = seller["id"] if seller else None
+        status_val = f if f != "all" else None
+        total = count_sales(seller_id=seller_id, status=status_val)
+        if total == 0:
+            await query.edit_message_text("📭 No sales found.")
+            return
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        sales = get_sales(limit=PAGE_SIZE, offset=0, seller_id=seller_id, status=status_val)
+        from handlers.sell import _fmt_sales_page, _sales_keyboard
+        text = _fmt_sales_page(sales, 1, total_pages)
+        kb = _sales_keyboard(1, total_pages)
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return
+
+    if data.startswith("salesfilterpage:"):
+        if not await require_seller(update):
+            return
+        try:
+            page = int(data.split(":")[1])
+        except ValueError:
+            return
+        role = get_user_role(user_id)
+        seller = get_seller_by_user_id(user_id) if role != "admin" else None
+        seller_id = seller["id"] if seller else None
+        sf = state.get(user_id, "sales_filter")
+        status_val = sf if sf and sf != "all" else None
+        total = count_sales(seller_id=seller_id, status=status_val)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        page = max(1, min(page, total_pages))
+        state.set(user_id, "sales_page", page)
+        sales = get_sales(limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE, seller_id=seller_id, status=status_val)
+        from handlers.sell import _fmt_sales_page, _sales_keyboard
+        text = _fmt_sales_page(sales, page, total_pages)
+        kb = _sales_keyboard(page, total_pages)
         await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return
 
@@ -430,32 +636,37 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "menu:list":
         if not await require_seller(update):
             return
-        state.set(user_id, "list_page", 1)
         state.set(user_id, "list_filter", None)
-        total = count_accounts()
-        if total == 0:
-            await query.edit_message_text("📭 No accounts found.")
-            return
+        state.set(user_id, "list_page", 1)
+        accounts, total = apply_list_filters(None, limit=PAGE_SIZE, offset=0)
         total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-        accounts = list_accounts(limit=PAGE_SIZE, offset=0)
-        text = f"<b>📋 Accounts (1/{total_pages})</b>\n\n"
-        for acc in accounts:
-            text += fmt_compact(acc) + "\n"
-        filter_row = [
-            InlineKeyboardButton("All", callback_data="listfilter:all"),
-            InlineKeyboardButton("Available", callback_data="listfilter:available"),
-            InlineKeyboardButton("Sold", callback_data="listfilter:sold"),
-        ]
-        cat_row = [
-            InlineKeyboardButton("By Category", callback_data="listfiltercat"),
-        ]
-        nav_row = []
-        if 1 > 1:
-            nav_row.append(InlineKeyboardButton("⬅️", callback_data="accountpage:0"))
-        nav_row.append(InlineKeyboardButton(f"1/{total_pages}", callback_data="noop"))
-        if total_pages > 1:
-            nav_row.append(InlineKeyboardButton("➡️", callback_data="accountpage:2"))
-        kb = InlineKeyboardMarkup([filter_row, cat_row, nav_row])
+        text = fmt_account_list_page(accounts, 1, total_pages, title="Accounts")
+        kb = filter_page_keyboard(
+            "listfilter", 1, total_pages,
+            include_all=True, include_available=True, include_sold=True,
+            include_pending=True, include_ids=True,
+        )
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return
+
+    if data.startswith("listfilter:") and not data.startswith("listfiltercat") and not data.startswith("listfilterids") and not data.startswith("listfilterpage:"):
+        if not await require_seller(update):
+            return
+        f = data.split(":", 1)[1]
+        if f == "all":
+            state.set(user_id, "list_filter", None)
+        else:
+            state.set(user_id, "list_filter", f"status:{f}")
+        state.set(user_id, "list_page", 1)
+        filter_str = state.get(user_id, "list_filter")
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        text = fmt_account_list_page(accounts, 1, total_pages, title="Accounts")
+        kb = filter_page_keyboard(
+            "listfilter", 1, total_pages,
+            include_all=True, include_available=True, include_sold=True,
+            include_pending=True, include_ids=True,
+        )
         await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return
 
@@ -479,39 +690,380 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         state.set(user_id, "list_filter", f"cat:{cat_id}")
         state.set(user_id, "list_page", 1)
-        total = count_accounts(category_id=cat_id)
-        if total == 0:
-            await query.edit_message_text("📭 No accounts in this category.")
-            return
+        filter_str = state.get(user_id, "list_filter")
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
         total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-        accounts = list_accounts(limit=PAGE_SIZE, offset=0, category_id=cat_id)
-        cat_name = get_category_name(cat_id) or "—"
-        text = f"<b>📋 {cat_name} (1/{total_pages})</b>\n\n"
-        for acc in accounts:
-            text += fmt_compact(acc) + "\n"
-        filter_row = [
-            InlineKeyboardButton("All", callback_data="listfilter:all"),
-            InlineKeyboardButton("Available", callback_data="listfilter:available"),
-            InlineKeyboardButton("Sold", callback_data="listfilter:sold"),
-        ]
-        cat_row = [
-            InlineKeyboardButton("By Category", callback_data="listfiltercat"),
-        ]
-        nav_row = []
-        if 1 > 1:
-            nav_row.append(InlineKeyboardButton("⬅️", callback_data="accountpage:0"))
-        nav_row.append(InlineKeyboardButton(f"1/{total_pages}", callback_data="noop"))
-        if total_pages > 1:
-            nav_row.append(InlineKeyboardButton("➡️", callback_data="accountpage:2"))
-        kb = InlineKeyboardMarkup([filter_row, cat_row, nav_row])
+        text = fmt_account_list_page(accounts, 1, total_pages, title="Accounts")
+        kb = filter_page_keyboard(
+            "listfilter", 1, total_pages,
+            include_all=True, include_available=True, include_sold=True,
+            include_pending=True, include_ids=True,
+        )
         await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return
 
-    # ── Search ─────────────────────────────────────────────
-    if data == "menu:search":
-        state.set(user_id, "search_stage", "type")
-        from core.keyboards import search_type_keyboard
-        await query.edit_message_text("Select search type:", reply_markup=search_type_keyboard())
+    if data == "listfilterids":
+        if not await require_seller(update):
+            return
+        state.set(user_id, "list_ids_input", True)
+        await query.edit_message_text("🔢 Enter account IDs (comma-separated):")
+        return
+
+    if data.startswith("listfilterpage:"):
+        if not await require_seller(update):
+            return
+        try:
+            page = int(data.split(":")[1])
+        except ValueError:
+            return
+        state.set(user_id, "list_page", page)
+        filter_str = state.get(user_id, "list_filter")
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        page = max(1, min(page, total_pages))
+        text = fmt_account_list_page(accounts, page, total_pages, title="Accounts")
+        kb = filter_page_keyboard(
+            "listfilter", page, total_pages,
+            include_all=True, include_available=True, include_sold=True,
+            include_pending=True, include_ids=True,
+        )
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return
+
+    # ── Delete flow ────────────────────────────────────────
+    if data.startswith("delfilter:") and not data.startswith("delfiltercat") and not data.startswith("delfilterids") and not data.startswith("delfilterpage:"):
+        if not await require_admin(update):
+            return
+        f = data.split(":", 1)[1]
+        if f == "all":
+            state.set(user_id, "delete_filter", None)
+        else:
+            state.set(user_id, "delete_filter", f"status:{f}")
+        state.set(user_id, "delete_page", 1)
+        filter_str = state.get(user_id, "delete_filter")
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        text = fmt_account_list_page(accounts, 1, total_pages, title="Delete Accounts")
+        kb = filter_page_keyboard(
+            "delfilter", 1, total_pages,
+            include_all=True, include_available=True, include_sold=True,
+            include_pending=True, include_ids=True,
+        )
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return
+
+    if data == "delfiltercat":
+        if not await require_admin(update):
+            return
+        kb = category_keyboard("delfiltercatpick")
+        if not kb:
+            await query.edit_message_text("📭 No categories found.")
+            return
+        await query.edit_message_text("📂 Select a category:", reply_markup=kb)
+        return
+
+    if data.startswith("delfiltercatpick:"):
+        if not await require_admin(update):
+            return
+        cat_id_str = data.split(":", 1)[1]
+        try:
+            cat_id = int(cat_id_str)
+        except ValueError:
+            return
+        state.set(user_id, "delete_filter", f"cat:{cat_id}")
+        state.set(user_id, "delete_page", 1)
+        filter_str = state.get(user_id, "delete_filter")
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        text = fmt_account_list_page(accounts, 1, total_pages, title="Delete Accounts")
+        kb = filter_page_keyboard(
+            "delfilter", 1, total_pages,
+            include_all=True, include_available=True, include_sold=True,
+            include_pending=True, include_ids=True,
+        )
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return
+
+    if data == "delfilterids":
+        if not await require_admin(update):
+            return
+        state.set(user_id, "del_ids_input", True)
+        await query.edit_message_text("🔢 Enter account IDs to delete (comma-separated):")
+        return
+
+    if data.startswith("delfilterpage:"):
+        if not await require_admin(update):
+            return
+        try:
+            page = int(data.split(":")[1])
+        except ValueError:
+            return
+        state.set(user_id, "delete_page", page)
+        filter_str = state.get(user_id, "delete_filter")
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        page = max(1, min(page, total_pages))
+        text = fmt_account_list_page(accounts, page, total_pages, title="Delete Accounts")
+        kb = filter_page_keyboard(
+            "delfilter", page, total_pages,
+            include_all=True, include_available=True, include_sold=True,
+            include_pending=True, include_ids=True,
+        )
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return
+
+    if data.startswith("delsingle:"):
+        if not await require_admin(update):
+            return
+        try:
+            account_id = int(data.split(":")[1])
+        except ValueError:
+            return
+        account = get_account_by_id(account_id)
+        if not account:
+            await query.edit_message_text("🔍 Account not found.")
+            return
+        state.set(user_id, "delete_confirm", account_id)
+        await query.edit_message_text(
+            f"⚠️ Delete account #{account_id} ({esc(_d(account)['username'])})?",
+            reply_markup=confirm_keyboard(f"delconfirm:{account_id}", "delcancel"),
+        )
+        return
+
+    if data.startswith("delconfirm:"):
+        if not await require_admin(update):
+            return
+        parts = data.split(":")
+        try:
+            account_id = int(parts[1])
+        except ValueError:
+            return
+        state.pop(user_id, "delete_confirm", None)
+        success = delete_account(account_id)
+        if success:
+            await query.edit_message_text(f"✅ Account #{account_id} deleted.")
+        else:
+            await query.edit_message_text("❌ Failed to delete account.")
+        return
+
+    if data == "delcancel":
+        state.pop(user_id, "delete_confirm", None)
+        await query.edit_message_text("❌ Deletion cancelled.")
+        return
+
+    # ── Inventory ──────────────────────────────────────────
+    if data == "menu:inventory":
+        if not await require_seller(update):
+            return
+        from handlers.inventory import inventory_cmd
+        state.set(user_id, "inv_filter", None)
+        state.set(user_id, "inv_page", 1)
+        cats = list_categories()
+        if not cats:
+            await query.edit_message_text("📭 No categories found.")
+            return
+        available = count_accounts(status="available")
+        sold = count_accounts(status="sold")
+        pending = count_accounts(status="pending_payment")
+        summary = get_sales_summary()
+        text = "<b>📦 Inventory Overview</b>\n\n"
+        text += f"🟢 Available: {available}\n"
+        text += f"🔴 Sold: {sold}\n"
+        text += f"🟡 Pending Payment: {pending}\n"
+        text += f"💰 Total revenue: ₹{summary.get('total_revenue', 0):.0f}\n"
+        text += f"💳 Pending: ₹{summary.get('pending_amount', 0):.0f}\n\n"
+        text += "<b>📂 By Category:</b>\n"
+        for cat in cats:
+            cat_avail = count_accounts(category_id=cat["id"], status="available")
+            cat_sold = count_accounts(category_id=cat["id"], status="sold")
+            cat_pend = count_accounts(category_id=cat["id"], status="pending_payment")
+            text += f"• {esc(cat['name'])}: 🟢{cat_avail} 🔴{cat_sold} 🟡{cat_pend}\n"
+        kb = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🟢 Available", callback_data="invfilter:available"),
+                InlineKeyboardButton("🔴 Sold", callback_data="invfilter:sold"),
+            ],
+            [
+                InlineKeyboardButton("🟡 Pending", callback_data="invfilter:pending_payment"),
+                InlineKeyboardButton("📋 All", callback_data="invfilter:all"),
+            ],
+            [
+                InlineKeyboardButton("📂 By Category", callback_data="invfiltercat"),
+            ],
+        ])
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return
+
+    if data.startswith("invfilter:") and not data.startswith("invfiltercat") and not data.startswith("invfilterpage:"):
+        if not await require_seller(update):
+            return
+        f = data.split(":", 1)[1]
+        if f == "all":
+            state.set(user_id, "inv_filter", None)
+        else:
+            state.set(user_id, "inv_filter", f"status:{f}")
+        state.set(user_id, "inv_page", 1)
+        filter_str = state.get(user_id, "inv_filter")
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        text = fmt_account_list_page(accounts, 1, total_pages, title="Inventory")
+        kb = filter_page_keyboard(
+            "invfilter", 1, total_pages,
+            include_all=True, include_available=True, include_sold=True,
+            include_pending=True,
+        )
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return
+
+    if data == "invfiltercat":
+        if not await require_seller(update):
+            return
+        kb = category_keyboard("invfiltercatpick")
+        if not kb:
+            await query.edit_message_text("📭 No categories found.")
+            return
+        await query.edit_message_text("📂 Select a category:", reply_markup=kb)
+        return
+
+    if data.startswith("invfiltercatpick:"):
+        if not await require_seller(update):
+            return
+        cat_id_str = data.split(":", 1)[1]
+        try:
+            cat_id = int(cat_id_str)
+        except ValueError:
+            return
+        state.set(user_id, "inv_filter", f"cat:{cat_id}")
+        state.set(user_id, "inv_page", 1)
+        filter_str = state.get(user_id, "inv_filter")
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        text = fmt_account_list_page(accounts, 1, total_pages, title="Inventory")
+        kb = filter_page_keyboard(
+            "invfilter", 1, total_pages,
+            include_all=True, include_available=True, include_sold=True,
+            include_pending=True,
+        )
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return
+
+    if data.startswith("invfilterpage:"):
+        if not await require_seller(update):
+            return
+        try:
+            page = int(data.split(":")[1])
+        except ValueError:
+            return
+        state.set(user_id, "inv_page", page)
+        filter_str = state.get(user_id, "inv_filter")
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        page = max(1, min(page, total_pages))
+        text = fmt_account_list_page(accounts, page, total_pages, title="Inventory")
+        kb = filter_page_keyboard(
+            "invfilter", page, total_pages,
+            include_all=True, include_available=True, include_sold=True,
+            include_pending=True,
+        )
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return
+
+    # ── Mark account status ────────────────────────────────
+    if data.startswith("markstatus:"):
+        if not await require_seller(update):
+            return
+        parts = data.split(":", 2)
+        try:
+            account_id = int(parts[1])
+            new_status = parts[2]
+        except (ValueError, IndexError):
+            return
+        if new_status not in ("available", "sold", "pending_payment"):
+            return
+        success = set_account_status(account_id, new_status)
+        if success:
+            emoji = {"available": "🟢", "sold": "🔴", "pending_payment": "🟡"}.get(new_status, "⚪")
+            await query.edit_message_text(f"✅ Account #{account_id} marked as {emoji} {new_status}.")
+        else:
+            await query.edit_message_text("❌ Failed to update status.")
+        return
+
+    # ── Mark sale status (from /sale view) ─────────────────
+    if data.startswith("markpaid:"):
+        if not await require_seller(update):
+            return
+        try:
+            sale_id = int(data.split(":")[1])
+        except ValueError:
+            return
+        sale = get_sale_by_id(sale_id)
+        if not sale:
+            await query.edit_message_text("🔍 Sale not found.")
+            return
+        role = get_user_role(user_id)
+        if role != "admin" and _d(sale).get("seller_user_id") != user_id:
+            await query.edit_message_text("⚠️ You can only mark your own sales as paid.")
+            return
+        new_status = "paid" if _d(sale).get("payment_status") == "pending" else "pending"
+        mark_payment(sale_id, new_status)
+        label = "paid" if new_status == "paid" else "pending"
+        await query.edit_message_text(f"✅ Sale #{sale_id} marked as {label}.")
+        if new_status == "paid":
+            await notify_admin(context, f"✅ Payment received! Sale #{sale_id} — ₹{_d(sale).get('price', 0):.0f} from {_d(sale).get('buyer_name')}")
+        return
+
+    if data.startswith("marksaleunsold:"):
+        if not await require_seller(update):
+            return
+        try:
+            sale_id = int(data.split(":")[1])
+        except ValueError:
+            return
+        sale = get_sale_by_id(sale_id)
+        if not sale:
+            await query.edit_message_text("🔍 Sale not found.")
+            return
+        sd = _d(sale)
+        void_sale(sale_id)
+        await query.edit_message_text(f"✅ Sale #{sale_id} voided. Account returned to available stock.")
+        await notify_admin(context, fmt_void_notification(sale_id))
+        return
+
+    if data.startswith("marksalepending:"):
+        if not await require_seller(update):
+            return
+        try:
+            sale_id = int(data.split(":")[1])
+        except ValueError:
+            return
+        sale = get_sale_by_id(sale_id)
+        if not sale:
+            await query.edit_message_text("🔍 Sale not found.")
+            return
+        mark_payment(sale_id, "pending")
+        await query.edit_message_text(f"✅ Sale #{sale_id} marked as 🟡 pending payment.")
+        return
+
+    # ── Void sale confirm/cancel ───────────────────────────
+    if data.startswith("voidconfirm:"):
+        if not await require_admin(update):
+            return
+        try:
+            sale_id = int(data.split(":")[1])
+        except ValueError:
+            return
+        state.pop(user_id, "void_confirm", None)
+        success = void_sale(sale_id)
+        if success:
+            await query.edit_message_text(f"✅ Sale #{sale_id} voided. Account returned to available stock.")
+            await notify_admin(context, fmt_void_notification(sale_id))
+        else:
+            await query.edit_message_text("❌ Failed to void sale.")
+        return
+
+    if data == "voidcancel":
+        state.pop(user_id, "void_confirm", None)
+        await query.edit_message_text("❌ Void cancelled.")
         return
 
     # ── Stats ──────────────────────────────────────────────
@@ -553,36 +1105,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "menu:report":
         if not await require_admin(update):
             return
-        from core.keyboards import report_period_keyboard
         await query.edit_message_text("📊 Select a period:", reply_markup=report_period_keyboard())
         return
 
-    # ── Inventory ──────────────────────────────────────────
-    if data == "menu:inventory":
-        if not await require_seller(update):
+    if data.startswith("report:"):
+        if not await require_admin(update):
             return
-        from database.accounts import count_accounts as ca
-        from database.sales import get_sales_summary
-        cats = list_categories()
-        available = ca(status="active")
-        sold = ca(used=True)
-        banned = ca(status="banned")
-        locked = ca(status="locked")
-        restricted = ca(status="restricted")
-        summary = get_sales_summary()
-        text = "<b>📦 Inventory Overview</b>\n\n"
-        text += f"🟢 Active: {available}\n"
-        text += f"🔴 Sold: {sold}\n"
-        text += f"⛔ Banned: {banned}\n"
-        text += f"🔒 Locked: {locked}\n"
-        text += f"⚠️ Restricted: {restricted}\n"
-        text += f"💰 Total revenue: ₹{summary['total_revenue']:.0f}\n\n"
-        text += "<b>By Category:</b>\n"
-        for cat in cats:
-            cat_available = ca(category_id=cat["id"], status="active")
-            cat_sold = ca(category_id=cat["id"], used=True)
-            text += f"• {esc(cat['name'])}: {cat_available} active, {cat_sold} sold\n"
-        await query.edit_message_text(_truncate(text), parse_mode="HTML")
+        period = data.split(":", 1)[1]
+        await handle_report_period(update, context, period)
         return
 
     # ── Settings ───────────────────────────────────────────
@@ -636,17 +1166,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         finally:
             if os.path.exists(filepath):
                 os.remove(filepath)
-        return
-
-    # ── Preview category selection ─────────────────────────
-    if data.startswith("previewcat:"):
-        cat_id_str = data.split(":", 1)[1]
-        if cat_id_str != "all":
-            try:
-                int(cat_id_str)
-            except ValueError:
-                return
-        await handle_preview_category(update, context, cat_id_str)
         return
 
     # ── Bulk add category selection ────────────────────────
@@ -732,10 +1251,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             mapping["email_password"] = col_idx
             state.set(user_id, "csv_mapping", mapping)
             state.set(user_id, "csv_stage", "map_2fa")
-            buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
-            buttons.append([InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:2fa")])
+            buttons = [
+                [InlineKeyboardButton("Yes", callback_data="csvbool:2fa:yes"),
+                 InlineKeyboardButton("No", callback_data="csvbool:2fa:no")],
+                [InlineKeyboardButton(h, callback_data=f"csvcol:{i}") for i, h in enumerate(headers)],
+                [InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:2fa")],
+            ]
             await query.edit_message_text(
-                f"✅ Email Password: {esc(headers[col_idx])}\n\nWhich column is the <b>2FA status</b>? (or skip)",
+                f"✅ Email Password: {esc(headers[col_idx])}\n\nIs 2FA a column, or set all to Yes/No?",
                 parse_mode="HTML",
                 reply_markup=InlineKeyboardMarkup(buttons),
             )
@@ -743,10 +1266,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             mapping["has_2fa"] = col_idx
             state.set(user_id, "csv_mapping", mapping)
             state.set(user_id, "csv_stage", "map_verified")
-            buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
-            buttons.append([InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:verified")])
+            buttons = [
+                [InlineKeyboardButton("Yes", callback_data="csvbool:verified:yes"),
+                 InlineKeyboardButton("No", callback_data="csvbool:verified:no")],
+                [InlineKeyboardButton(h, callback_data=f"csvcol:{i}") for i, h in enumerate(headers)],
+                [InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:verified")],
+            ]
             await query.edit_message_text(
-                f"✅ 2FA: {esc(headers[col_idx])}\n\nWhich column is the <b>verified status</b>? (or skip)",
+                f"✅ 2FA: {esc(headers[col_idx])}\n\nIs verified a column, or set all to Yes/No?",
                 parse_mode="HTML",
                 reply_markup=InlineKeyboardMarkup(buttons),
             )
@@ -767,12 +1294,47 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await _csv_show_preview(update, context, user_id, query)
         return
 
+    # ── CSV bool shortcuts (Yes/No for 2FA/verified) ───────
+    if data.startswith("csvbool:"):
+        if not await require_admin(update):
+            return
+        parts = data.split(":")
+        field = parts[1]
+        val = parts[2] == "yes"
+        mapping = state.get(user_id, "csv_mapping", {})
+        mapping[field] = val
+        state.set(user_id, "csv_mapping", mapping)
+        if field == "2fa":
+            state.set(user_id, "csv_stage", "map_verified")
+            headers = state.get(user_id, "csv_headers", [])
+            buttons = [
+                [InlineKeyboardButton("Yes", callback_data="csvbool:verified:yes"),
+                 InlineKeyboardButton("No", callback_data="csvbool:verified:no")],
+                [InlineKeyboardButton(h, callback_data=f"csvcol:{i}") for i, h in enumerate(headers)],
+                [InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:verified")],
+            ]
+            await query.edit_message_text(
+                f"✅ 2FA: {'All Yes' if val else 'All No'}\n\nIs verified a column, or set all to Yes/No?",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(buttons),
+            )
+        elif field == "verified":
+            state.set(user_id, "csv_stage", "map_notes")
+            headers = state.get(user_id, "csv_headers", [])
+            buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
+            buttons.append([InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:notes")])
+            await query.edit_message_text(
+                f"✅ Verified: {'All Yes' if val else 'All No'}\n\nWhich column is <b>notes</b>? (or skip)",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(buttons),
+            )
+        return
+
     if data.startswith("csvskip:"):
         if not await require_admin(update):
             return
         field = data.split(":")[1]
         stage = state.get(user_id, "csv_stage")
-        mapping = state.get(user_id, "csv_mapping", {})
         headers = state.get(user_id, "csv_headers", [])
 
         if stage == "map_email":
@@ -786,19 +1348,27 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         elif stage == "map_email_password":
             state.set(user_id, "csv_stage", "map_2fa")
-            buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
-            buttons.append([InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:2fa")])
+            buttons = [
+                [InlineKeyboardButton("Yes", callback_data="csvbool:2fa:yes"),
+                 InlineKeyboardButton("No", callback_data="csvbool:2fa:no")],
+                [InlineKeyboardButton(h, callback_data=f"csvcol:{i}") for i, h in enumerate(headers)],
+                [InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:2fa")],
+            ]
             await query.edit_message_text(
-                "⏭️ Email password skipped\n\nWhich column is the <b>2FA status</b>? (or skip)",
+                "⏭️ Email password skipped\n\nIs 2FA a column, or set all to Yes/No?",
                 parse_mode="HTML",
                 reply_markup=InlineKeyboardMarkup(buttons),
             )
         elif stage == "map_2fa":
             state.set(user_id, "csv_stage", "map_verified")
-            buttons = [[InlineKeyboardButton(h, callback_data=f"csvcol:{i}")] for i, h in enumerate(headers)]
-            buttons.append([InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:verified")])
+            buttons = [
+                [InlineKeyboardButton("Yes", callback_data="csvbool:verified:yes"),
+                 InlineKeyboardButton("No", callback_data="csvbool:verified:no")],
+                [InlineKeyboardButton(h, callback_data=f"csvcol:{i}") for i, h in enumerate(headers)],
+                [InlineKeyboardButton("⏭️ Skip", callback_data="csvskip:verified")],
+            ]
             await query.edit_message_text(
-                "⏭️ 2FA skipped\n\nWhich column is the <b>verified status</b>? (or skip)",
+                "⏭️ 2FA skipped\n\nIs verified a column, or set all to Yes/No?",
                 parse_mode="HTML",
                 reply_markup=InlineKeyboardMarkup(buttons),
             )
@@ -842,28 +1412,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for key in ("csv_headers", "csv_data", "csv_mapping", "csv_category", "csv_stage"):
             state.pop(user_id, key, None)
         await query.edit_message_text("❌ CSV import cancelled.")
-        return
-
-    # ── Delete confirm/cancel ──────────────────────────────
-    if data.startswith("delconfirm:"):
-        if not await require_admin(update):
-            return
-        parts = data.split(":")
-        try:
-            account_id = int(parts[1])
-        except ValueError:
-            return
-        state.pop(user_id, "delete_confirm", None)
-        success = delete_account(account_id)
-        if success:
-            await query.edit_message_text(f"✅ Account #{account_id} deleted.")
-        else:
-            await query.edit_message_text("❌ Failed to delete account.")
-        return
-
-    if data == "delcancel":
-        state.pop(user_id, "delete_confirm", None)
-        await query.edit_message_text("❌ Deletion cancelled.")
         return
 
     # ── Bulk delete confirm/cancel ─────────────────────────
@@ -922,225 +1470,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ Category deletion cancelled.")
         return
 
-    # ── Mark paid ──────────────────────────────────────────
-    if data.startswith("markpaid:"):
-        if not await require_seller(update):
-            return
-        parts = data.split(":")
-        try:
-            sale_id = int(parts[1])
-        except ValueError:
-            return
-        sale = get_sale_by_id(sale_id)
-        if not sale:
-            await query.edit_message_text("🔍 Sale not found.")
-            return
-        role = get_user_role(user_id)
-        if role != "admin" and sale["seller_user_id"] != user_id:
-            await query.edit_message_text("⚠️ You can only mark your own sales as paid.")
-            return
-        new_status = "paid" if sale["payment_status"] == "pending" else "pending"
-        mark_payment(sale_id, new_status)
-        label = "paid" if new_status == "paid" else "pending"
-        await query.edit_message_text(f"✅ Sale #{sale_id} marked as {label}.")
-        if new_status == "paid":
-            await notify_admin(context, f"✅ Payment received! Sale #{sale_id} — ₹{sale['price']:.0f} from {sale['buyer_name']}")
-        return
-
-    # ── Void sale confirm/cancel ───────────────────────────
-    if data.startswith("voidconfirm:"):
-        if not await require_admin(update):
-            return
-        parts = data.split(":")
-        try:
-            sale_id = int(parts[1])
-        except ValueError:
-            return
-        state.pop(user_id, "void_confirm", None)
-        success = void_sale(sale_id)
-        if success:
-            await query.edit_message_text(f"✅ Sale #{sale_id} voided. Account returned to stock.")
-            await notify_admin(context, fmt_void_notification(sale_id))
-        else:
-            await query.edit_message_text("❌ Failed to void sale.")
-        return
-
-    if data == "voidcancel":
-        state.pop(user_id, "void_confirm", None)
-        await query.edit_message_text("❌ Void cancelled.")
-        return
-
-    # ── Account pagination ─────────────────────────────────
-    if data.startswith("accountpage:"):
-        if not await require_seller(update):
-            return
-        try:
-            page = int(data.split(":")[1])
-        except ValueError:
-            return
-        f = state.get(user_id, "list_filter")
-        used_val = None
-        if f == "available":
-            used_val = False
-        elif f == "sold":
-            used_val = True
-        cat_id = None
-        if f and f.startswith("cat:"):
-            try:
-                cat_id = int(f.split(":")[1])
-            except ValueError:
-                pass
-        total = count_accounts(used=used_val, category_id=cat_id)
-        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-        page = max(1, min(page, total_pages))
-        state.set(user_id, "list_page", page)
-        accounts = list_accounts(limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE, used=used_val, category_id=cat_id)
-        text = f"<b>📋 Accounts ({page}/{total_pages})</b>\n\n"
-        for acc in accounts:
-            text += fmt_compact(acc) + "\n"
-        filter_row = [
-            InlineKeyboardButton("All", callback_data="listfilter:all"),
-            InlineKeyboardButton("Available", callback_data="listfilter:available"),
-            InlineKeyboardButton("Sold", callback_data="listfilter:sold"),
-        ]
-        cat_row = [
-            InlineKeyboardButton("By Category", callback_data="listfiltercat"),
-        ]
-        nav_row = []
-        if page > 1:
-            nav_row.append(InlineKeyboardButton("⬅️", callback_data=f"accountpage:{page - 1}"))
-        nav_row.append(InlineKeyboardButton(f"{page}/{total_pages}", callback_data="noop"))
-        if page < total_pages:
-            nav_row.append(InlineKeyboardButton("➡️", callback_data=f"accountpage:{page + 1}"))
-        kb = InlineKeyboardMarkup([filter_row, cat_row, nav_row])
-        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
-        return
-
-    # ── List filter ────────────────────────────────────────
-    if data.startswith("listfilter:") and not data.startswith("listfiltercat"):
-        if not await require_seller(update):
-            return
-        f = data.split(":", 1)[1]
-        state.set(user_id, "list_filter", f if f != "all" else None)
-        state.set(user_id, "list_page", 1)
-        cat_id = None
-        used_val = None
-        if f.startswith("cat:"):
-            try:
-                cat_id = int(f.split(":")[1])
-            except ValueError:
-                pass
-        elif f == "available":
-            used_val = False
-        elif f == "sold":
-            used_val = True
-        total = count_accounts(used=used_val, category_id=cat_id)
-        if total == 0:
-            await query.edit_message_text("📭 No accounts found.")
-            return
-        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-        accounts = list_accounts(limit=PAGE_SIZE, offset=0, used=used_val, category_id=cat_id)
-        text = f"<b>📋 Accounts (1/{total_pages})</b>\n\n"
-        for acc in accounts:
-            text += fmt_compact(acc) + "\n"
-        filter_row = [
-            InlineKeyboardButton("All", callback_data="listfilter:all"),
-            InlineKeyboardButton("Available", callback_data="listfilter:available"),
-            InlineKeyboardButton("Sold", callback_data="listfilter:sold"),
-        ]
-        cat_row = [
-            InlineKeyboardButton("By Category", callback_data="listfiltercat"),
-        ]
-        nav_row = []
-        if 1 > 1:
-            nav_row.append(InlineKeyboardButton("⬅️", callback_data="accountpage:0"))
-        nav_row.append(InlineKeyboardButton(f"1/{total_pages}", callback_data="noop"))
-        if total_pages > 1:
-            nav_row.append(InlineKeyboardButton("➡️", callback_data="accountpage:2"))
-        kb = InlineKeyboardMarkup([filter_row, cat_row, nav_row])
-        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
-        return
-
-    # ── Sales pagination ───────────────────────────────────
-    if data.startswith("salespage:"):
-        if not await require_seller(update):
-            return
-        try:
-            page = int(data.split(":")[1])
-        except ValueError:
-            return
-        role = get_user_role(user_id)
-        seller = get_seller_by_user_id(user_id) if role != "admin" else None
-        seller_id = seller["id"] if seller else None
-        sf = state.get(user_id, "sales_filter")
-        status_val = sf if sf and sf != "all" else None
-        total = count_sales(seller_id=seller_id, status=status_val)
-        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-        page = max(1, min(page, total_pages))
-        state.set(user_id, "sales_page", page)
-        sales = get_sales(limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE, seller_id=seller_id, status=status_val)
-        text = f"<b>📈 Sales ({page}/{total_pages})</b>\n\n"
-        for s in sales:
-            text += (
-                f"• #{s['id']} | {esc(s['buyer_name'])} | "
-                f"₹{s['price']:.0f} | {esc(s['payment_status'])} | "
-                f"{esc(dict(s).get('seller_name', '—'))}\n"
-            )
-        filter_buttons = [
-            InlineKeyboardButton("All", callback_data="salesfilter:all"),
-            InlineKeyboardButton("Pending", callback_data="salesfilter:pending"),
-            InlineKeyboardButton("Paid", callback_data="salesfilter:paid"),
-        ]
-        nav_buttons = []
-        if page > 1:
-            nav_buttons.append(InlineKeyboardButton("⬅️", callback_data=f"salespage:{page - 1}"))
-        nav_buttons.append(InlineKeyboardButton(f"{page}/{total_pages}", callback_data="noop"))
-        if page < total_pages:
-            nav_buttons.append(InlineKeyboardButton("➡️", callback_data=f"salespage:{page + 1}"))
-        kb = InlineKeyboardMarkup([filter_buttons, nav_buttons])
-        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
-        return
-
-    # ── Sales filter ───────────────────────────────────────
-    if data.startswith("salesfilter:"):
-        if not await require_seller(update):
-            return
-        f = data.split(":", 1)[1]
-        state.set(user_id, "sales_filter", f)
-        state.set(user_id, "sales_page", 1)
-        role = get_user_role(user_id)
-        seller = get_seller_by_user_id(user_id) if role != "admin" else None
-        seller_id = seller["id"] if seller else None
-        status_val = f if f != "all" else None
-        total = count_sales(seller_id=seller_id, status=status_val)
-        if total == 0:
-            await query.edit_message_text("📭 No sales found.")
-            return
-        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-        sales = get_sales(limit=PAGE_SIZE, offset=0, seller_id=seller_id, status=status_val)
-        text = f"<b>📈 Sales (1/{total_pages})</b>\n\n"
-        for s in sales:
-            text += (
-                f"• #{s['id']} | {esc(s['buyer_name'])} | "
-                f"₹{s['price']:.0f} | {esc(s['payment_status'])} | "
-                f"{esc(dict(s).get('seller_name', '—'))}\n"
-            )
-        filter_buttons = [
-            InlineKeyboardButton("All", callback_data="salesfilter:all"),
-            InlineKeyboardButton("Pending", callback_data="salesfilter:pending"),
-            InlineKeyboardButton("Paid", callback_data="salesfilter:paid"),
-        ]
-        nav_buttons = []
-        if 1 > 1:
-            nav_buttons.append(InlineKeyboardButton("⬅️", callback_data="salespage:0"))
-        nav_buttons.append(InlineKeyboardButton(f"1/{total_pages}", callback_data="noop"))
-        if total_pages > 1:
-            nav_buttons.append(InlineKeyboardButton("➡️", callback_data="salespage:2"))
-        kb = InlineKeyboardMarkup([filter_buttons, nav_buttons])
-        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
-        return
-
-    # ── Search type ────────────────────────────────────────
+    # ── Search ─────────────────────────────────────────────
     if data.startswith("search:"):
         if not await require_seller(update):
             return
@@ -1148,10 +1478,92 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_search_type(update, context, search_type)
         return
 
-    # ── Report period ──────────────────────────────────────
-    if data.startswith("report:"):
-        if not await require_admin(update):
+    if data.startswith("searchcat:"):
+        if not await require_seller(update):
             return
-        period = data.split(":", 1)[1]
-        await handle_report_period(update, context, period)
+        cat_id_str = data.split(":", 1)[1]
+        await handle_search_category(update, context, cat_id_str)
         return
+
+    if data.startswith("searchstatus:"):
+        if not await require_seller(update):
+            return
+        status_val = data.split(":", 1)[1]
+        await handle_search_status(update, context, status_val)
+        return
+
+
+async def _csv_show_preview(update, context, user_id, query):
+    headers = state.get(user_id, "csv_headers", [])
+    csv_data = state.get(user_id, "csv_data", [])
+    mapping = state.get(user_id, "csv_mapping", {})
+    state.set(user_id, "csv_stage", "preview")
+    accounts = build_accounts_from_csv(headers, csv_data, mapping)
+    if not accounts:
+        await query.edit_message_text("📭 No valid accounts found in CSV with the selected mapping.")
+        return
+    preview = accounts[:3]
+    map_desc = []
+    if "username" in mapping:
+        map_desc.append(f"Username: {headers[mapping['username']]}")
+    if "password" in mapping:
+        map_desc.append(f"Password: {headers[mapping['password']]}")
+    if "email" in mapping:
+        map_desc.append(f"Email: {headers[mapping['email']]}")
+    if "email_password" in mapping:
+        map_desc.append(f"Email Pass: {headers[mapping['email_password']]}")
+    if isinstance(mapping.get("has_2fa"), int):
+        map_desc.append(f"2FA: {headers[mapping['has_2fa']]}")
+    elif mapping.get("has_2fa") is True:
+        map_desc.append("2FA: All Yes")
+    elif mapping.get("has_2fa") is False:
+        map_desc.append("2FA: All No")
+    if isinstance(mapping.get("is_verified"), int):
+        map_desc.append(f"Verified: {headers[mapping['is_verified']]}")
+    elif mapping.get("is_verified") is True:
+        map_desc.append("Verified: All Yes")
+    elif mapping.get("is_verified") is False:
+        map_desc.append("Verified: All No")
+    if "notes" in mapping:
+        map_desc.append(f"Notes: {headers[mapping['notes']]}")
+    text = f"<b>CSV Preview ({len(accounts)} accounts):</b>\n\n"
+    text += "<b>Mapping:</b> " + " | ".join(map_desc) + "\n\n"
+    for acc in preview:
+        text += f"• {esc(acc.get('username', ''))} | {esc(str(acc.get('password', ''))[:4])}***"
+        if acc.get("email"):
+            text += f" | {esc(acc['email'])}"
+        text += "\n"
+    if len(accounts) > 3:
+        text += f"\n... and {len(accounts) - 3} more"
+    await query.edit_message_text(
+        text, parse_mode="HTML",
+        reply_markup=confirm_keyboard("csvconfirm", "csvcancel"),
+    )
+
+
+def _bulksell_select_keyboard(selected, accounts, page, total_pages):
+    buttons = []
+    for acc in accounts:
+        a = _d(acc)
+        mark = "✅" if a["id"] in selected else "  "
+        buttons.append([
+            InlineKeyboardButton(
+                f"{mark} #{a['id']} | {esc(a['username'])}",
+                callback_data=f"bulkseltoggle:{a['id']}",
+            )
+        ])
+    nav_row = []
+    if page > 1:
+        nav_row.append(InlineKeyboardButton("⬅️", callback_data=f"bulkselpage:{page - 1}"))
+    nav_row.append(InlineKeyboardButton(f"📄 {page}/{total_pages}", callback_data="noop"))
+    if page < total_pages:
+        nav_row.append(InlineKeyboardButton("➡️", callback_data=f"bulkselpage:{page + 1}"))
+    buttons.append(nav_row)
+    buttons.append([
+        InlineKeyboardButton(
+            f"✅ Done ({len(selected)} selected)",
+            callback_data="bulkselldone",
+        ),
+        InlineKeyboardButton("❌ Cancel", callback_data="bulksellcancel"),
+    ])
+    return InlineKeyboardMarkup(buttons)

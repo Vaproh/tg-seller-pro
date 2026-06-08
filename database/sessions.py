@@ -142,7 +142,7 @@ def stats_summary():
     conn = connect()
     try:
         accounts = conn.execute(
-            "SELECT COUNT(*) as total, SUM(CASE WHEN used = 1 THEN 1 ELSE 0 END) as used_count FROM accounts"
+            "SELECT COUNT(*) as total, SUM(CASE WHEN status = 'sold' THEN 1 ELSE 0 END) as used_count FROM accounts"
         ).fetchone()
         sessions = conn.execute(
             "SELECT COUNT(*) as total FROM retrieval_sessions"

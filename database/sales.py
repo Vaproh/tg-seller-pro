@@ -1,52 +1,55 @@
 import sqlite3
 from database.connection import connect
-from database.accounts import set_account_sold, get_account_by_id
 
 
-def sell_account(account_id, seller_id, buyer, price, tags=None, notes=None):
+def sell_account(account_id, seller_id, buyer, price, payment_status="pending", notes=None):
     conn = connect()
     try:
-        account = get_account_by_id(account_id)
+        account = conn.execute(
+            "SELECT id, status FROM accounts WHERE id = ?", (account_id,)
+        ).fetchone()
         if not account:
             return False, "Account not found.", None
-        if account["status"] != "active":
-            return False, f"Account is '{account['status']}', not active.", None
+        if account["status"] != "available":
+            return False, f"Account is '{account['status']}', not available.", None
         cursor = conn.execute(
-            """INSERT INTO sales (account_id, seller_id, buyer_name, price, tags, notes)
+            """INSERT INTO sales (account_id, seller_id, buyer_name, price, payment_status, notes)
                VALUES (?, ?, ?, ?, ?, ?)""",
-            (account_id, seller_id, buyer, price, tags, notes),
+            (account_id, seller_id, buyer, price, payment_status, notes),
         )
+        new_status = "pending_payment" if payment_status == "pending" else "sold"
         conn.execute(
-            "UPDATE accounts SET status = 'sold', used = 1, used_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (account_id,),
+            "UPDATE accounts SET status = ? WHERE id = ?",
+            (new_status, account_id),
         )
         conn.commit()
         return True, "Sale recorded.", cursor.lastrowid
     except sqlite3.IntegrityError:
-        return False, "Account already sold.", None
+        return False, "Account already has a sale record.", None
     finally:
         conn.close()
 
 
-def bulk_sell_accounts(ids, seller_id, buyer, price_each, tags=None, notes=None):
+def bulk_sell_accounts(ids, seller_id, buyer, price_each, payment_status="pending", notes=None):
     added = 0
     skipped = 0
     conn = connect()
     try:
         for aid in ids:
             account = conn.execute("SELECT id, status FROM accounts WHERE id = ?", (aid,)).fetchone()
-            if not account or account["status"] != "active":
+            if not account or account["status"] != "available":
                 skipped += 1
                 continue
             try:
                 conn.execute(
-                    """INSERT INTO sales (account_id, seller_id, buyer_name, price, tags, notes)
+                    """INSERT INTO sales (account_id, seller_id, buyer_name, price, payment_status, notes)
                        VALUES (?, ?, ?, ?, ?, ?)""",
-                    (aid, seller_id, buyer, price_each, tags, notes),
+                    (aid, seller_id, buyer, price_each, payment_status, notes),
                 )
+                new_status = "pending_payment" if payment_status == "pending" else "sold"
                 conn.execute(
-                    "UPDATE accounts SET status = 'sold', used = 1, used_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (aid,),
+                    "UPDATE accounts SET status = ? WHERE id = ?",
+                    (new_status, aid),
                 )
                 added += 1
             except sqlite3.IntegrityError:
@@ -60,10 +63,20 @@ def bulk_sell_accounts(ids, seller_id, buyer, price_each, tags=None, notes=None)
 def mark_payment(sale_id, status):
     conn = connect()
     try:
+        sale = conn.execute(
+            "SELECT account_id FROM sales WHERE id = ?", (sale_id,)
+        ).fetchone()
+        if not sale:
+            return False
         cursor = conn.execute(
             "UPDATE sales SET payment_status = ? WHERE id = ?",
             (status, sale_id),
         )
+        if status == "paid":
+            conn.execute(
+                "UPDATE accounts SET status = 'sold' WHERE id = ?",
+                (sale["account_id"],),
+            )
         conn.commit()
         return cursor.rowcount > 0
     finally:
@@ -159,6 +172,17 @@ def get_buyers(seller_id=None):
         conn.close()
 
 
+def get_buyer_names():
+    conn = connect()
+    try:
+        rows = conn.execute(
+            "SELECT DISTINCT buyer_name FROM sales ORDER BY buyer_name"
+        ).fetchall()
+        return [r["buyer_name"] for r in rows]
+    finally:
+        conn.close()
+
+
 def get_buyer_sales(buyer, seller_id=None, limit=20):
     conn = connect()
     try:
@@ -219,7 +243,7 @@ def void_sale(sale_id):
             return False
         conn.execute("DELETE FROM sales WHERE id = ?", (sale_id,))
         conn.execute(
-            "UPDATE accounts SET status = 'active', used = 0, used_at = NULL WHERE id = ?",
+            "UPDATE accounts SET status = 'available' WHERE id = ?",
             (sale["account_id"],),
         )
         conn.commit()

@@ -22,6 +22,8 @@ def _d(row):
 
 def fmt_account_block(account):
     a = _d(account)
+    status = a.get("status", "available")
+    status_emoji = {"available": "🟢", "sold": "🔴", "pending_payment": "🟡"}.get(status, "⚪")
     lines = [
         f"╭─ Account #{a.get('id', '')} ────────────────",
         f"│ 👤 Username: {esc(a.get('username'))}",
@@ -35,7 +37,7 @@ def fmt_account_block(account):
     lines.append(f"│ ✅ Verified: {'Yes' if a.get('is_verified') else 'No'}")
     lines.append(f"│ 🔗 Profile: {reddit_url(a.get('username', ''))}")
     lines.append(f"│ 📂 Category: {esc(a.get('category_name', '—'))}")
-    lines.append(f"│ 📦 Status: {esc(a.get('status', 'active'))}")
+    lines.append(f"│ 📦 Status: {status_emoji} {esc(status)}")
     lines.append(f"│ 📝 Notes: {esc(a.get('notes'))}")
     lines.append("╰──────────────────────────")
     return "\n".join(lines)
@@ -43,14 +45,14 @@ def fmt_account_block(account):
 
 def fmt_sale_block(sale):
     s = _d(sale)
+    ps = s.get("payment_status", "pending")
+    ps_emoji = "✅" if ps == "paid" else "🟡" if ps == "pending" else "⚪"
     lines = [
         f"╭─ Sale #{s.get('id', '')} ────────────────",
         f"│ 👤 Buyer: {esc(s.get('buyer_name'))}",
         f"│ 💰 Price: {config.CURRENCY}{s.get('price', 0):.0f}",
-        f"│ 💳 Status: {esc(s.get('payment_status'))}",
+        f"│ 💳 Payment: {ps_emoji} {esc(ps)}",
     ]
-    if s.get("tags"):
-        lines.append(f"│ 🏷️ Tags: {esc(s['tags'])}")
     lines.append(f"│ 📅 Sold: {esc(str(s.get('sold_at', ''))[:10])}")
     lines.append(f"│ 👨‍💼 Seller: {esc(s.get('seller_name', '—'))}")
     lines.append(f"│ 🔗 Profile: {reddit_url(s.get('username', ''))}")
@@ -68,6 +70,8 @@ def fmt_receipt(sale):
     price = s.get("price", 0)
     sale_id = s.get("id", "")
     sold_at = str(s.get("sold_at", ""))[:10]
+    ps = s.get("payment_status", "pending")
+    ps_label = "Pending Payment" if ps == "pending" else "Paid"
     return (
         "╔══════════════════════════════════╗\n"
         "║     🧾 Reddit Account Receipt    ║\n"
@@ -77,17 +81,8 @@ def fmt_receipt(sale):
         f"║ Profile: reddit.com/user/{esc(username)}\n"
         "║──────────────────────────────────║\n"
         f"║ Price: {config.CURRENCY}{price:.0f}\n"
+        f"║ Status: {ps_label}\n"
         f"║ Sale ID: #{sale_id}\n"
         f"║ Date: {sold_at}\n"
         "╚══════════════════════════════════╝"
-    )
-
-
-def fmt_compact(account):
-    a = _d(account)
-    return (
-        f"• #{a.get('id', '')} | {esc(a.get('username'))} | "
-        f"{esc(a.get('category_name', '—'))} | "
-        f"{esc(a.get('status', 'active'))} | "
-        f"{config.CURRENCY}{a.get('default_price', 0):.0f}"
     )

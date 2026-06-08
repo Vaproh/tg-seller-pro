@@ -2,9 +2,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller
 from core.state import state
-from core.format import esc, reddit_url
+from core.format import esc, reddit_url, _d
 from core.keyboards import category_keyboard
-from database import get_unused_accounts_for_category, get_category_name
+from database import get_available_accounts_for_category, list_accounts, get_category_name
 
 
 async def preview_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -49,26 +49,26 @@ async def handle_preview_count(update: Update, context: ContextTypes.DEFAULT_TYP
         return
     cat_id = state.get(user_id, "preview_category")
     if cat_id == "all":
-        from database.accounts import list_accounts as la
-        accounts = la(limit=count, status="active")
+        accounts = list_accounts(limit=count, status="available")
     else:
-        accounts = get_unused_accounts_for_category(cat_id, limit=count)
+        accounts = get_available_accounts_for_category(cat_id, limit=count)
     state.pop(user_id, "preview_stage")
     state.pop(user_id, "preview_category")
     if not accounts:
-        await update.message.reply_text("📭 No accounts available.")
+        await update.message.reply_text("📭 No available accounts.")
         return
     text = f"<b>📂 {len(accounts)} accounts:</b>\n\n"
     buttons = []
     for acc in accounts:
+        a = _d(acc)
         text += (
-            f"• #{acc['id']} | <code>{esc(acc['username'])}</code>\n"
-            f"  🔗 {reddit_url(acc['username'])}\n"
+            f"• #{a.get('id', '')} | <code>{esc(a.get('username'))}</code>\n"
+            f"  🔗 {reddit_url(a.get('username', ''))}\n"
         )
         buttons.append([
             InlineKeyboardButton(
-                f"💰 Sell #{acc['id']} ({esc(acc['username'])})",
-                callback_data=f"quick sell:{acc['id']}",
+                f"💰 Sell #{a['id']} ({esc(a['username'])})",
+                callback_data=f"quicksell:{a['id']}",
             )
         ])
     kb = InlineKeyboardMarkup(buttons) if buttons else None

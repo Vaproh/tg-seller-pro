@@ -4,10 +4,16 @@ from telegram.ext import ContextTypes
 from core.permissions import require_seller, require_admin
 from core.state import state
 from core.format import esc
-from core.keyboards import category_keyboard, confirm_keyboard, sell_accounts_keyboard, yes_no_keyboard
+from core.keyboards import category_keyboard, confirm_keyboard
+from core.filters import (
+    payment_status_keyboard, buyer_keyboard, parse_id_list,
+    apply_list_filters, count_from_filter, fmt_account_list_page,
+    filter_page_keyboard, PAGE_SIZE,
+)
 from database import (
     add_account, add_accounts_bulk, get_account_by_id,
     list_accounts, sell_account, get_category_name,
+    delete_account, delete_accounts_by_ids, get_buyer_names,
 )
 from utils.parsers import parse_bulk_lines, parse_csv_file
 from utils.csv_utils import detect_columns, build_accounts_from_csv
@@ -25,6 +31,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
 
+    # ── Add account wizard ─────────────────────────────────
     stage = state.get(user_id, "add_stage")
     if stage == "username":
         if len(text) > config.MAX_USERNAME_LEN:
@@ -62,11 +69,20 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if text.lower() == "/skip":
             state.set(user_id, "add_email_password", None)
             state.set(user_id, "add_stage", "2fa")
-            await update.message.reply_text("🔐 Is 2FA enabled?", reply_markup=yes_no_keyboard("add2fa"))
+            await update.message.reply_text("🔐 Is 2FA enabled?", reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("Yes", callback_data="add2fa:yes"),
+                 InlineKeyboardButton("No", callback_data="add2fa:no")],
+            ]))
             return
         state.set(user_id, "add_email_password", text)
         state.set(user_id, "add_stage", "2fa")
-        await update.message.reply_text("✅ Email password saved\n🔐 Is 2FA enabled?", reply_markup=yes_no_keyboard("add2fa"))
+        await update.message.reply_text(
+            "✅ Email password saved\n🔐 Is 2FA enabled?",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("Yes", callback_data="add2fa:yes"),
+                 InlineKeyboardButton("No", callback_data="add2fa:no")],
+            ]),
+        )
         return
 
     if stage == "notes":
@@ -91,6 +107,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("📂 No categories. Create one with /addcategory first.")
         return
 
+    # ── Bulk add ───────────────────────────────────────────
     bulk_stage = state.get(user_id, "bulk_stage")
     if bulk_stage == "lines":
         if text.lower() == "/done":
@@ -121,6 +138,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ {len(lines)} lines received. Send more or /done.")
         return
 
+    # ── Bulk delete ────────────────────────────────────────
     bd_mode = state.get(user_id, "bulk_delete_mode")
     if bd_mode == "input":
         state.set(user_id, "bulk_delete_input", text)
@@ -132,103 +150,136 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # ── Preview count ──────────────────────────────────────
     preview_stage = state.get(user_id, "preview_stage")
     if preview_stage == "count":
         from handlers.preview import handle_preview_count
         await handle_preview_count(update, context, text)
         return
 
+    # ── Search value ───────────────────────────────────────
     search_stage = state.get(user_id, "search_stage")
     if search_stage == "value":
         from handlers.search import handle_search_value
         await handle_search_value(update, context, text)
         return
 
+    # ── ID input for filters ───────────────────────────────
+    if state.get(user_id, "sell_ids_input"):
+        state.pop(user_id, "sell_ids_input")
+        ids = parse_id_list(text)
+        if not ids:
+            await update.message.reply_text("⚠️ No valid IDs. Enter comma-separated numbers:")
+            state.set(user_id, "sell_ids_input", True)
+            return
+        state.set(user_id, "sell_filter", f"ids:{','.join(str(i) for i in ids)}")
+        state.set(user_id, "sell_page", 1)
+        filter_str = state.get(user_id, "sell_filter")
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        text_msg = fmt_account_list_page(accounts, 1, total_pages, title="Available Accounts to Sell")
+        kb = filter_page_keyboard(
+            "sellfilter", 1, total_pages,
+            include_available=True, include_sold=False, include_pending=False,
+            include_all=False, include_ids=True,
+        )
+        await update.message.reply_text(text_msg, parse_mode="HTML", reply_markup=kb)
+        return
+
+    if state.get(user_id, "list_ids_input"):
+        state.pop(user_id, "list_ids_input")
+        ids = parse_id_list(text)
+        if not ids:
+            await update.message.reply_text("⚠️ No valid IDs. Enter comma-separated numbers:")
+            state.set(user_id, "list_ids_input", True)
+            return
+        state.set(user_id, "list_filter", f"ids:{','.join(str(i) for i in ids)}")
+        state.set(user_id, "list_page", 1)
+        filter_str = state.get(user_id, "list_filter")
+        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        text_msg = fmt_account_list_page(accounts, 1, total_pages, title="Accounts")
+        kb = filter_page_keyboard(
+            "listfilter", 1, total_pages,
+            include_all=True, include_available=True, include_sold=True,
+            include_pending=True, include_ids=True,
+        )
+        await update.message.reply_text(text_msg, parse_mode="HTML", reply_markup=kb)
+        return
+
+    if state.get(user_id, "del_ids_input"):
+        state.pop(user_id, "del_ids_input")
+        ids = parse_id_list(text)
+        if not ids:
+            await update.message.reply_text("⚠️ No valid IDs. Enter comma-separated numbers:")
+            state.set(user_id, "del_ids_input", True)
+            return
+        from database import delete_accounts_by_ids
+        deleted = delete_accounts_by_ids(ids)
+        await update.message.reply_text(f"✅ Deleted {deleted} account(s).")
+        return
+
+    # ── Sell flow ──────────────────────────────────────────
     sell_stage = state.get(user_id, "sell_stage")
     if sell_stage == "buyer":
         if len(text) > config.MAX_BUYER_LEN:
             await update.message.reply_text(f"⚠️ Buyer name too long (max {config.MAX_BUYER_LEN} chars).")
             return
         state.set(user_id, "sell_buyer", text)
-        account_id = state.get(user_id, "sell_account_id")
-        account = get_account_by_id(account_id)
-        default_price = 0
-        if account:
-            from database.categories import list_categories as lc
-            cats = lc()
-            for c in cats:
-                if c["id"] == account["category_id"]:
-                    default_price = c["default_price"]
-                    break
         state.set(user_id, "sell_stage", "price")
-        await update.message.reply_text(
-            f"👤 Buyer: {esc(text)}\n"
-            f"💰 Default price: ₹{default_price:.0f}\n💸 Enter price (or /skip for default):"
-        )
+        await update.message.reply_text(f"👤 Buyer: {esc(text)}\n\n💰 Enter price (₹):")
         return
 
     if sell_stage == "price":
-        if text.lower() == "/skip":
-            account_id = state.get(user_id, "sell_account_id")
-            account = get_account_by_id(account_id)
-            default_price = 0
-            if account:
-                from database.categories import list_categories as lc
-                cats = lc()
-                for c in cats:
-                    if c["id"] == account["category_id"]:
-                        default_price = c["default_price"]
-                        break
-            price = default_price
-        else:
-            try:
-                price = float(text.replace("₹", "").replace(",", ""))
-            except ValueError:
-                await update.message.reply_text("⚠️ Enter a valid price:")
-                return
-            if price < 0:
-                await update.message.reply_text("⚠️ Price must be positive:")
-                return
-        state.set(user_id, "sell_price", price)
-        state.set(user_id, "sell_stage", "tags")
-        await update.message.reply_text("🏷️ Add tags? (or /skip)")
-        return
-
-    if sell_stage == "tags":
-        tags = text if text.lower() != "/skip" else None
-        state.set(user_id, "sell_tags", tags)
-        account_id = state.get(user_id, "sell_account_id")
-        buyer = state.get(user_id, "sell_buyer")
-        price = state.get(user_id, "sell_price")
-        account = get_account_by_id(account_id)
-        if not account:
-            await update.message.reply_text("🔍 Account not found.")
-            state.pop(user_id, "sell_stage")
+        try:
+            price = float(text.replace("₹", "").replace(",", ""))
+        except ValueError:
+            await update.message.reply_text("⚠️ Enter a valid price:")
             return
-        text_preview = (
-            f"<b>Confirm Sale:</b>\n\n"
-            f"Account: #{account['id']} — {esc(account['username'])}\n"
-            f"Buyer: {esc(buyer)}\n"
-            f"Price: ₹{price:.0f}\n"
-            f"Tags: {esc(tags) if tags else '—'}\n\n"
-            f"✅ Confirm?"
-        )
-        state.set(user_id, "sell_stage", "confirm")
+        if price < 0:
+            await update.message.reply_text("⚠️ Price must be positive:")
+            return
+        state.set(user_id, "sell_price", price)
         await update.message.reply_text(
-            text_preview,
-            parse_mode="HTML",
-            reply_markup=confirm_keyboard("sellconfirm", "sellcancel"),
+            "📦 Mark as:",
+            reply_markup=payment_status_keyboard("paystatus"),
         )
         return
 
+    # ── Bulk sell flow ─────────────────────────────────────
     bulksell_stage = state.get(user_id, "bulksell_stage")
+    if bulksell_stage == "number":
+        try:
+            count = int(text)
+            if count <= 0:
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("⚠️ Enter a positive number:")
+            return
+        available = count_accounts(status="available")
+        if count > available:
+            await update.message.reply_text(f"⚠️ Only {available} available. Enter a smaller number:")
+            return
+        state.set(user_id, "bulksell_count", count)
+        state.set(user_id, "bulksell_stage", "buyer")
+        buyer_names = get_buyer_names()
+        if buyer_names:
+            kb = buyer_keyboard(buyer_names, "bulkbuypick")
+            await update.message.reply_text(
+                f"👤 {count} accounts will be sold.\nSelect buyer:",
+                reply_markup=kb,
+            )
+        else:
+            await update.message.reply_text(f"👤 {count} accounts will be sold.\nEnter buyer name:")
+        return
+
     if bulksell_stage == "buyer":
         if len(text) > config.MAX_BUYER_LEN:
             await update.message.reply_text(f"⚠️ Buyer name too long (max {config.MAX_BUYER_LEN} chars).")
             return
         state.set(user_id, "bulksell_buyer", text)
         state.set(user_id, "bulksell_stage", "price")
-        await update.message.reply_text("💰 Enter price per account:")
+        await update.message.reply_text("💰 Enter price per account (₹):")
         return
 
     if bulksell_stage == "price":
@@ -241,14 +292,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ Price must be positive:")
             return
         state.set(user_id, "bulksell_price", price)
-        state.set(user_id, "bulksell_stage", "select")
-        accounts = list_accounts(limit=20, status="active")
-        if not accounts:
-            await update.message.reply_text("📭 No available accounts.")
-            state.pop(user_id, "bulksell_stage")
-            return
-        kb = sell_accounts_keyboard(accounts, "bulksellselect")
-        await update.message.reply_text("💰 Select accounts to sell:", reply_markup=kb)
+        count = state.get(user_id, "bulksell_count")
+        accounts = list_accounts(limit=count, status="available")
+        selected = [get_account_by_id(a["id"])["id"] if get_account_by_id(a["id"]) else a["id"] for a in accounts]
+        selected = [a["id"] for a in accounts]
+        state.set(user_id, "bulksell_selected", selected)
+        state.set(user_id, "bulksell_stage", "payment")
+        await update.message.reply_text(
+            f"📦 Mark as:",
+            reply_markup=payment_status_keyboard("bulksellpaystatus"),
+        )
         return
 
 

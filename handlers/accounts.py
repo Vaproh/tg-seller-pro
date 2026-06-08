@@ -3,8 +3,12 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_admin, require_seller
 from core.state import state
-from core.format import esc, fmt_account_block, fmt_compact
-from core.keyboards import category_keyboard, confirm_keyboard, pagination_keyboard
+from core.format import esc, fmt_account_block, _d
+from core.keyboards import category_keyboard, confirm_keyboard
+from core.filters import (
+    filter_page_keyboard, apply_list_filters, count_from_filter,
+    fmt_account_list_page, parse_id_list, PAGE_SIZE,
+)
 from database import (
     add_account, add_accounts_bulk, get_account_by_id,
     list_accounts, count_accounts, delete_account, delete_accounts_by_ids,
@@ -15,8 +19,6 @@ from utils.notifications import notify_admin, fmt_bulk_import
 import config
 
 logger = logging.getLogger(__name__)
-
-PAGE_SIZE = 10
 
 
 async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -60,23 +62,33 @@ async def delete_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update):
         return
     args = context.args
-    if not args:
-        await update.message.reply_text("📝 Usage: /delete <account_id>")
+    if args:
+        try:
+            account_id = int(args[0])
+        except ValueError:
+            await update.message.reply_text("⚠️ Invalid ID.")
+            return
+        account = get_account_by_id(account_id)
+        if not account:
+            await update.message.reply_text("🔍 Account not found.")
+            return
+        state.set(update.effective_user.id, "delete_confirm", account_id)
+        await update.message.reply_text(
+            f"⚠️ Delete account #{account_id} ({esc(_d(account)['username'])})?",
+            reply_markup=confirm_keyboard(f"delconfirm:{account_id}", "delcancel"),
+        )
         return
-    try:
-        account_id = int(args[0])
-    except ValueError:
-        await update.message.reply_text("⚠️ Invalid ID.")
-        return
-    account = get_account_by_id(account_id)
-    if not account:
-        await update.message.reply_text("🔍 Account not found.")
-        return
-    state.set(update.effective_user.id, "delete_confirm", account_id)
-    await update.message.reply_text(
-        f"⚠️ Delete account #{account_id} ({esc(account['username'])})?",
-        reply_markup=confirm_keyboard(f"delconfirm:{account_id}", "delcancel"),
+    state.set(update.effective_user.id, "delete_filter", None)
+    state.set(update.effective_user.id, "delete_page", 1)
+    accounts, total = apply_list_filters(None, limit=PAGE_SIZE, offset=0)
+    total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    text = fmt_account_list_page(accounts, 1, total_pages, title="Delete Accounts")
+    kb = filter_page_keyboard(
+        "delfilter", 1, total_pages,
+        include_all=True, include_available=True, include_sold=True,
+        include_pending=True, include_ids=True,
     )
+    await update.message.reply_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
 
 
 async def bulkdelete_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -102,16 +114,21 @@ async def extractcsv_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def list_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_seller(update):
         return
-    state.set(update.effective_user.id, "list_page", 1)
-    state.set(update.effective_user.id, "list_filter", None)
-    total = count_accounts()
-    if total == 0:
-        await update.message.reply_text("📭 No accounts found.")
-        return
+    user_id = update.effective_user.id
+    state.set(user_id, "list_filter", None)
+    state.set(user_id, "list_page", 1)
+    accounts, total = apply_list_filters(None, limit=PAGE_SIZE, offset=0)
     total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-    accounts = list_accounts(limit=PAGE_SIZE, offset=0)
-    text = f"<b>📋 Accounts (1/{total_pages})</b>\n\n"
-    for acc in accounts:
-        text += fmt_compact(acc) + "\n"
-    kb = pagination_keyboard("accountpage", 1, total_pages)
-    await update.message.reply_text(text, parse_mode="HTML", reply_markup=kb)
+    text = fmt_account_list_page(accounts, 1, total_pages, title="Accounts")
+    kb = filter_page_keyboard(
+        "listfilter", 1, total_pages,
+        include_all=True, include_available=True, include_sold=True,
+        include_pending=True, include_ids=True,
+    )
+    await update.message.reply_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+
+
+def _truncate(text, limit=4000):
+    if len(text) <= limit:
+        return text
+    return text[:limit - 20] + "\n\n... (truncated)"

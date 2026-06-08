@@ -20,15 +20,16 @@ async def handle_report_period(update: Update, context: ContextTypes.DEFAULT_TYP
     total = get_sales_summary()
     sellers = list_sellers()
     cats = list_categories()
-    available = count_accounts(status="active")
-    sold = count_accounts(used=True)
+    available = count_accounts(status="available")
+    sold = count_accounts(status="sold")
+    pending = count_accounts(status="pending_payment")
     period_labels = {"today": "Today", "week": "This Week", "month": "This Month", "all": "All Time"}
     label = period_labels.get(period, period)
     text = f"<b>📊 Report — {label}</b>\n\n"
-    text += f"💰 Revenue: ₹{summary['total_revenue']:.0f}\n"
-    text += f"📈 Sales: {summary['total_sales']}\n"
-    text += f"💳 Pending: {summary['pending_count']} (₹{summary['pending_amount']:.0f})\n"
-    text += f"📦 Inventory: {available} available, {sold} sold\n\n"
+    text += f"💰 Revenue: ₹{summary.get('total_revenue', 0):.0f}\n"
+    text += f"📈 Sales: {summary.get('total_sales', 0)}\n"
+    text += f"💳 Pending: {summary.get('pending_count', 0)} (₹{summary.get('pending_amount', 0):.0f})\n"
+    text += f"📦 Inventory: 🟢{available} 🔴{sold} 🟡{pending}\n\n"
     text += "<b>By Seller:</b>\n"
     has_seller_sales = False
     for s in sellers:
@@ -40,5 +41,5 @@ async def handle_report_period(update: Update, context: ContextTypes.DEFAULT_TYP
     text += "\n<b>By Category:</b>\n"
     for cat in cats:
         text += f"• {cat['name']}: {cat['account_count']} accounts\n"
-    text += f"\n<b>All-Time Total:</b> ₹{total['total_revenue']:.0f}"
+    text += f"\n<b>All-Time Total:</b> ₹{total.get('total_revenue', 0):.0f}"
     await query.edit_message_text(text, parse_mode="HTML")

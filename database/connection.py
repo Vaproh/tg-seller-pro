@@ -88,6 +88,18 @@ def migrate(conn, current_version):
         conn.commit()
         logger.info("Migration to V2 complete.")
 
+    if current_version < 3:
+        logger.info("Migrating schema from V2 to V3...")
+        # Migrate status values: active -> available, keep sold
+        conn.execute("UPDATE accounts SET status = 'available' WHERE status = 'active'")
+        # Remove redundant 'used' column concept by normalizing status
+        conn.execute("UPDATE accounts SET status = 'sold' WHERE used = 1 AND status != 'sold'")
+        # Drop old statuses that are no longer used
+        conn.execute("UPDATE accounts SET status = 'available' WHERE status IN ('banned', 'locked', 'restricted')")
+        set_schema_version(conn, 3)
+        conn.commit()
+        logger.info("Migration to V3 complete.")
+
 
 def init_db():
     conn = connect()
@@ -112,9 +124,7 @@ def init_db():
             is_verified INTEGER DEFAULT 0,
             category_id INTEGER NOT NULL,
             notes TEXT,
-            status TEXT DEFAULT 'active',
-            used INTEGER DEFAULT 0,
-            used_at TEXT,
+            status TEXT DEFAULT 'available',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT
         )
@@ -128,6 +138,11 @@ def init_db():
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS ix_accounts_category_id
         ON accounts (category_id)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS ix_accounts_status
+        ON accounts (status)
     """)
 
     cursor.execute("""
