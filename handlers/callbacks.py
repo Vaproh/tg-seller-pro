@@ -224,9 +224,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not seller:
             await query.edit_message_text("⚠️ You are not registered as a seller.")
             return
-        state.set(user_id, "sell_filter", None)
+        state.set(user_id, "sell_filter", "status:available")
         state.set(user_id, "sell_page", 1)
-        accounts, total = apply_list_filters(None, limit=PAGE_SIZE, offset=0)
+        accounts, total = apply_list_filters("status:available", limit=PAGE_SIZE, offset=0)
         total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
         text = fmt_account_list_page(accounts, 1, total_pages, title="Available Accounts to Sell")
         kb = filter_page_keyboard(
@@ -243,7 +243,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         f = data.split(":", 1)[1]
         if f == "all":
-            state.set(user_id, "sell_filter", None)
+            state.set(user_id, "sell_filter", "status:available")
         else:
             state.set(user_id, "sell_filter", f"status:{f}")
         state.set(user_id, "sell_page", 1)
@@ -437,10 +437,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         mode = data.split(":", 1)[1]
         if mode == "select":
-            state.set(user_id, "bulksell_filter", None)
+            state.set(user_id, "bulksell_filter", "status:available")
             state.set(user_id, "bulksell_selected", [])
             state.set(user_id, "bulksell_page", 1)
-            accounts, total = apply_list_filters(None, limit=PAGE_SIZE, offset=0)
+            accounts, total = apply_list_filters("status:available", limit=PAGE_SIZE, offset=0)
             total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
             text = f"<b>💰 Bulk Sell — Select accounts</b>\n\n"
             for acc in accounts:

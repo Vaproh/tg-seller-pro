@@ -39,9 +39,9 @@ async def sell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not seller:
         await update.message.reply_text("⚠️ You are not registered as a seller.")
         return
-    state.set(user_id, "sell_filter", None)
+    state.set(user_id, "sell_filter", "status:available")
     state.set(user_id, "sell_page", 1)
-    filter_str = None
+    filter_str = "status:available"
     accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
     total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
     text = fmt_account_list_page(accounts, 1, total_pages, title="Available Accounts to Sell")
