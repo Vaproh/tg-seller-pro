@@ -235,7 +235,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             price = float(text.replace("₹", "").replace(",", ""))
         except ValueError:
-                await update.message.reply_text("⚠️ Enter a valid price:")
+            await update.message.reply_text("⚠️ Enter a valid price:")
             return
         if price < 0:
             await update.message.reply_text("⚠️ Price must be positive:")
