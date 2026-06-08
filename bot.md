@@ -45,7 +45,16 @@ database/               SQLite layer
 
 handlers/               Telegram handlers
   __init__.py             register_handlers(app)
-  callbacks.py            ALL button tap handlers (~1500 lines)
+  callbacks/              Button tap handlers (split by domain)
+    __init__.py           try_handle() chain dispatch
+    menu.py               menu:back callback
+    add.py                Add account wizard (add2fa, addverified, addcat, addconfirm, addcancel)
+    sell.py               Sell flow + bulk sell (sellconfirm, bulksellcancel, etc.)
+    list.py               List, delete, inventory, mark status, bulk delete, category delete
+    sales.py              Sales view + sale status (markpaid, marksaleunsold, sellervoidconfirm, voidconfirm)
+    csv.py                CSV import (csvcol, csvbool, csvskip, csvconfirm, csvcancel)
+    search.py             Search callbacks
+    misc.py               Stats, sellers, report, settings, export, backup, help, preview
   messages.py             Free-text input + CSV upload
   sell.py                 /sell, /bulksell, /sales, /sale, /markpaid, /voidsale, /marksold, /markunsold, /markpendingpayment
   accounts.py             /add, /bulkadd, /getid, /delete, /bulkdelete, /extractcsv, /list
@@ -416,14 +425,18 @@ All sent to `ADMIN_USER_ID`.
 manager-telegram-bot/
 ├── main.py                 # Entry point
 ├── config.py               # Env config
-├── requirements.txt        # Dependencies
+├── requirements.txt        # Dependencies (incl. pytest)
 ├── .env.example            # Env template
 ├── .gitignore
+├── Dockerfile              # Docker build (Python 3.12-slim)
+├── docker-compose.yml      # Container config + volume mounts
+├── .dockerignore           # Docker build exclusions
+├── deploy.sh               # Deploy script (deploy/restart/stop/test/logs)
 ├── README.md               # Setup guide
 ├── bot.md                  # This file
 ├── database/
 │   ├── __init__.py
-│   ├── connection.py       # connect(), init_db(), migrate()
+│   ├── connection.py       # connect(), init_db(), migrate() — WAL mode, busy_timeout
 │   ├── categories.py
 │   ├── accounts.py
 │   ├── sales.py
@@ -431,7 +444,16 @@ manager-telegram-bot/
 │   └── sessions.py
 ├── handlers/
 │   ├── __init__.py
-│   ├── callbacks.py        # All button handlers
+│   ├── callbacks/          # Button handlers (split by domain)
+│   │   ├── __init__.py     # try_handle() chain dispatch
+│   │   ├── menu.py
+│   │   ├── add.py
+│   │   ├── sell.py
+│   │   ├── list.py
+│   │   ├── sales.py
+│   │   ├── csv.py
+│   │   ├── search.py
+│   │   └── misc.py
 │   ├── messages.py         # Text input + CSV upload
 │   ├── sell.py
 │   ├── accounts.py
@@ -449,7 +471,7 @@ manager-telegram-bot/
 ├── core/
 │   ├── __init__.py
 │   ├── permissions.py
-│   ├── format.py
+│   ├── format.py           # esc(), _truncate(), fmt_account_block(), fmt_sale_block(), fmt_receipt()
 │   ├── keyboards.py
 │   ├── filters.py          # Shared filter system
 │   ├── state.py
@@ -460,6 +482,18 @@ manager-telegram-bot/
 │   ├── notifications.py
 │   ├── csv_utils.py
 │   └── parsers.py
+├── tests/                  # pytest test suite (116 tests)
+│   ├── conftest.py         # Test fixtures (isolated DB per test)
+│   ├── test_database.py
+│   ├── test_sales.py
+│   ├── test_categories.py
+│   ├── test_format.py
+│   ├── test_parsers.py
+│   ├── test_csv_utils.py
+│   ├── test_state.py
+│   ├── test_filters.py
+│   ├── test_permissions.py
+│   └── test_handlers.py
 ├── data/                   # SQLite DB (gitignored)
 └── logs/                   # Log files (gitignored)
 ```

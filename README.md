@@ -44,6 +44,37 @@ TIMEZONE=Asia/Kolkata
 python main.py
 ```
 
+## Docker Deployment
+
+### Using deploy script (recommended)
+
+```bash
+# Deploy (pull + build + start)
+./deploy.sh deploy
+
+# Other commands
+./deploy.sh restart    # Restart bot
+./deploy.sh stop       # Stop bot
+./deploy.sh start      # Start bot
+./deploy.sh logs       # View logs
+./deploy.sh status     # Container status
+./deploy.sh test       # Run test suite
+./deploy.sh rebuild    # Full rebuild from scratch
+```
+
+### Manual Docker
+
+```bash
+# Build and start
+docker compose up -d --build
+
+# View logs
+docker compose logs -f
+
+# Stop
+docker compose down
+```
+
 ## Commands
 
 ### Account Management
@@ -120,18 +151,25 @@ python main.py
 ```
 ├── main.py                 # Entry point
 ├── config.py               # Environment config
-├── requirements.txt        # Dependencies
+├── requirements.txt        # Dependencies (incl. pytest)
 ├── .env.example            # Env template
+├── Dockerfile              # Docker build (Python 3.12-slim)
+├── docker-compose.yml      # Container config + volume mounts
+├── .dockerignore           # Docker build exclusions
+├── deploy.sh               # Deploy script (deploy/restart/stop/test/logs)
 ├── bot.md                  # Full documentation
 ├── database/               # SQLite database layer
-│   ├── connection.py       # DB connection + migrations
+│   ├── connection.py       # DB connection + migrations (WAL mode)
 │   ├── categories.py       # Category CRUD
 │   ├── accounts.py         # Account CRUD + search
 │   ├── sales.py            # Sale CRUD + revenue
 │   ├── sellers.py          # Seller CRUD
 │   └── sessions.py         # Legacy retrieval sessions
 ├── handlers/               # Telegram command handlers
-│   ├── callbacks.py        # All button tap handlers
+│   ├── callbacks/          # Button handlers (split by domain)
+│   │   ├── __init__.py     # Chain dispatch
+│   │   ├── menu.py, add.py, sell.py, list.py
+│   │   ├── sales.py, csv.py, search.py, misc.py
 │   ├── messages.py         # Free-text input handlers
 │   ├── sell.py             # Sell flow
 │   ├── accounts.py         # Add/delete/list
@@ -140,18 +178,36 @@ python main.py
 │   └── ...
 ├── core/                   # Shared utilities
 │   ├── filters.py          # Reusable filter system
-│   ├── format.py           # Text formatting
+│   ├── format.py           # Text formatting (_truncate, esc, etc.)
 │   ├── keyboards.py        # Inline keyboards
 │   ├── permissions.py      # Role checks
 │   ├── state.py            # State manager (TTL)
 │   └── help_content.py     # Help text
-└── utils/                  # Utilities
-    ├── scheduler.py        # APScheduler jobs
-    ├── notifications.py    # Admin notifications
-    ├── csv_utils.py        # CSV import/export
-    └── parsers.py          # Input parsers
+├── utils/                  # Utilities
+│   ├── scheduler.py        # APScheduler jobs
+│   ├── notifications.py    # Admin notifications
+│   ├── csv_utils.py        # CSV import/export
+│   └── parsers.py          # Input parsers
+└── tests/                  # pytest test suite (116 tests)
+    ├── conftest.py         # Test fixtures
+    └── test_*.py           # 10 test modules
 ```
 
 ## License
 
 Private use only.
+
+## Testing
+
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run specific test file
+pytest tests/test_database.py -v
+
+# Run with deploy script
+./deploy.sh test
+```
+
+116 tests covering database operations, sell flow, filters, formatting, state management, and more.

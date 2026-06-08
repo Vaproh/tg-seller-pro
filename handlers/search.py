@@ -2,19 +2,13 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller
 from core.state import state
-from core.format import esc, _d
+from core.format import esc, _d, _truncate
 from core.filters import (
     filter_page_keyboard, fmt_account_list_line, fmt_account_list_page,
     parse_filter_state, build_filter_state, PAGE_SIZE, MAX_MSG_LEN,
 )
 from database import search_accounts, list_categories, count_accounts
 import config
-
-
-def _truncate(text, limit=MAX_MSG_LEN):
-    if len(text) <= limit:
-        return text
-    return text[:limit - 20] + "\n\n... (truncated)"
 
 
 async def search_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):

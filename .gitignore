@@ -43,3 +43,4 @@ ENV/
 
 # Other
 *.log
+error.txt

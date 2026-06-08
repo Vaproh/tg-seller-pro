@@ -3,7 +3,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller, require_admin, get_user_role
 from core.state import state
-from core.format import esc, fmt_sale_block, fmt_receipt, _d
+from core.format import esc, fmt_sale_block, fmt_receipt, _d, _truncate
 from core.keyboards import confirm_keyboard
 from core.filters import (
     filter_page_keyboard, apply_list_filters, count_from_filter,
@@ -23,12 +23,6 @@ from utils.notifications import (
 import config
 
 logger = logging.getLogger(__name__)
-
-
-def _truncate(text, limit=4000):
-    if len(text) <= limit:
-        return text
-    return text[:limit - 20] + "\n\n... (truncated)"
 
 
 async def sell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -3,7 +3,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_admin, require_seller
 from core.state import state
-from core.format import esc, fmt_account_block, _d
+from core.format import esc, fmt_account_block, _d, _truncate
 from core.keyboards import category_keyboard, confirm_keyboard
 from core.filters import (
     filter_page_keyboard, apply_list_filters, count_from_filter,
@@ -126,9 +126,3 @@ async def list_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         include_pending=True, include_ids=True,
     )
     await update.message.reply_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
-
-
-def _truncate(text, limit=4000):
-    if len(text) <= limit:
-        return text
-    return text[:limit - 20] + "\n\n... (truncated)"

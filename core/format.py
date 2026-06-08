@@ -1,11 +1,19 @@
 import html
 import config
 
+MAX_MSG_LEN = 4000
+
 
 def esc(text):
     if text is None:
         return "—"
     return html.escape(str(text))
+
+
+def _truncate(text, limit=MAX_MSG_LEN):
+    if len(text) <= limit:
+        return text
+    return text[:limit - 20] + "\n\n... (truncated)"
 
 
 def reddit_url(username):

@@ -13,6 +13,9 @@ def connect():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute("PRAGMA synchronous = NORMAL")
     return conn
 
 
@@ -93,7 +96,10 @@ def migrate(conn, current_version):
         # Migrate status values: active -> available, keep sold
         conn.execute("UPDATE accounts SET status = 'available' WHERE status = 'active'")
         # Remove redundant 'used' column concept by normalizing status
-        conn.execute("UPDATE accounts SET status = 'sold' WHERE used = 1 AND status != 'sold'")
+        try:
+            conn.execute("UPDATE accounts SET status = 'sold' WHERE used = 1 AND status != 'sold'")
+        except sqlite3.OperationalError:
+            pass
         # Drop old statuses that are no longer used
         conn.execute("UPDATE accounts SET status = 'available' WHERE status IN ('banned', 'locked', 'restricted')")
         set_schema_version(conn, 3)
