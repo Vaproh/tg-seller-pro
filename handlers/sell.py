@@ -147,10 +147,12 @@ async def markpaid_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     buttons = []
     for s in pending:
+        sd = _d(s)
+        sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
         buttons.append([
             InlineKeyboardButton(
-                f"#{s['id']} | {s['buyer_name']} | ₹{s['price']:.0f}",
-                callback_data=f"markpaid:{s['id']}",
+                f"{sale_code} | {sd.get('buyer_name')} | ₹{sd.get('price', 0):.0f}",
+                callback_data=f"markpaid:{sd.get('id')}",
             )
         ])
     kb = InlineKeyboardMarkup(buttons)
@@ -176,11 +178,12 @@ async def voidsale_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not sale:
             invalid.append(id_str)
             continue
+        sale_code = _d(sale).get("sale_code", f"#{sale_id}")
         void_sale(sale_id)
-        valid.append(sale_id)
+        valid.append(sale_code)
     parts = []
     if valid:
-        parts.append(f"♻️ Voided: {', '.join(str(i) for i in valid)}")
+        parts.append(f"♻️ Voided: {', '.join(valid)}")
     if invalid:
         parts.append(f"⚠️ Not found: {', '.join(invalid)}")
     await update.message.reply_text("\n".join(parts))
@@ -279,8 +282,9 @@ def _fmt_sales_page(sales, page, total_pages):
         sd = _d(s)
         ps = sd.get("payment_status", "pending")
         ps_emoji = "✅" if ps == "paid" else "🟡" if ps == "pending" else "⚪"
+        sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
         text += (
-            f"• <b>#{sd.get('id', '')}</b> | {esc(sd.get('buyer_name'))} | "
+            f"• <b>{sale_code}</b> | {esc(sd.get('buyer_name'))} | "
             f"₹{sd.get('price', 0):.0f} | {ps_emoji} {esc(ps)} | "
             f"{esc(sd.get('seller_name', '—'))}\n"
         )
@@ -363,8 +367,9 @@ def _editsale_summary(sales, invalid_ids=None, created_drafts=None):
         ps_emoji = "✅" if ps == "paid" else "🟡"
         buyer = esc(s.get("buyer_name")) or "—"
         price = s.get("price", 0) or 0
+        sale_code = s.get("sale_code", f"#{s.get('id', '')}")
         text += (
-            f"• <b>#{s['id']}</b> | {buyer} | "
+            f"• <b>{sale_code}</b> | {buyer} | "
             f"₹{price:.0f} | {ps_emoji} {esc(ps)}\n"
         )
     if created_drafts:

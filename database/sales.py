@@ -1,5 +1,19 @@
 import sqlite3
+import secrets
+import string
 from database.connection import connect
+
+
+def _generate_sale_code():
+    alphabet = string.ascii_uppercase + string.digits
+    return "SALE-" + "".join(secrets.choice(alphabet) for _ in range(8))
+
+
+def _resolve_sale_id(conn, sale_id):
+    if isinstance(sale_id, int):
+        return sale_id
+    row = conn.execute("SELECT id FROM sales WHERE sale_code = ?", (str(sale_id),)).fetchone()
+    return row["id"] if row else None
 
 
 def sell_account(account_id, seller_id, buyer, price, payment_status="pending", notes=None):
@@ -12,10 +26,11 @@ def sell_account(account_id, seller_id, buyer, price, payment_status="pending", 
             return False, "Account not found.", None
         if account["status"] != "available":
             return False, f"Account is '{account['status']}', not available.", None
+        sale_code = _generate_sale_code()
         cursor = conn.execute(
-            """INSERT INTO sales (account_id, seller_id, buyer_name, price, payment_status, notes)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (account_id, seller_id, buyer, price, payment_status, notes),
+            """INSERT INTO sales (account_id, seller_id, buyer_name, price, payment_status, notes, sale_code)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (account_id, seller_id, buyer, price, payment_status, notes, sale_code),
         )
         new_status = "pending_payment" if payment_status == "pending" else "sold"
         conn.execute(
@@ -23,7 +38,7 @@ def sell_account(account_id, seller_id, buyer, price, payment_status="pending", 
             (new_status, account_id),
         )
         conn.commit()
-        return True, "Sale recorded.", cursor.lastrowid
+        return True, "Sale recorded.", sale_code
     except sqlite3.IntegrityError:
         return False, "Account already has a sale record.", None
     finally:
@@ -41,10 +56,11 @@ def bulk_sell_accounts(ids, seller_id, buyer, price_each, payment_status="pendin
                 skipped += 1
                 continue
             try:
+                sale_code = _generate_sale_code()
                 conn.execute(
-                    """INSERT INTO sales (account_id, seller_id, buyer_name, price, payment_status, notes)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
-                    (aid, seller_id, buyer, price_each, payment_status, notes),
+                    """INSERT INTO sales (account_id, seller_id, buyer_name, price, payment_status, notes, sale_code)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (aid, seller_id, buyer, price_each, payment_status, notes, sale_code),
                 )
                 new_status = "pending_payment" if payment_status == "pending" else "sold"
                 conn.execute(
@@ -65,14 +81,17 @@ def mark_payment(sale_id, status):
         return False
     conn = connect()
     try:
+        resolved_id = _resolve_sale_id(conn, sale_id)
+        if resolved_id is None:
+            return False
         sale = conn.execute(
-            "SELECT account_id FROM sales WHERE id = ?", (sale_id,)
+            "SELECT account_id FROM sales WHERE id = ?", (resolved_id,)
         ).fetchone()
         if not sale:
             return False
         cursor = conn.execute(
             "UPDATE sales SET payment_status = ? WHERE id = ?",
-            (status, sale_id),
+            (status, resolved_id),
         )
         if status == "paid":
             conn.execute(
@@ -142,6 +161,9 @@ def count_sales(seller_id=None, status=None):
 def get_sale_by_id(sale_id):
     conn = connect()
     try:
+        resolved_id = _resolve_sale_id(conn, sale_id)
+        if resolved_id is None:
+            return None
         row = conn.execute(
             """SELECT s.*, a.username, a.password, a.email, a.email_password,
                       a.has_2fa, a.is_verified, a.status as account_status,
@@ -149,9 +171,9 @@ def get_sale_by_id(sale_id):
                FROM sales s
                JOIN accounts a ON a.id = s.account_id
                JOIN categories c ON c.id = a.category_id
-               JOIN sellers sl ON sl.id = s.seller_id
+               LEFT JOIN sellers sl ON sl.id = s.seller_id
                WHERE s.id = ?""",
-            (sale_id,),
+            (resolved_id,),
         ).fetchone()
         return row
     finally:
@@ -247,15 +269,18 @@ def update_sale(sale_id, **fields):
         return False
     conn = connect()
     try:
-        sale = conn.execute("SELECT id FROM sales WHERE id = ?", (sale_id,)).fetchone()
+        resolved_id = _resolve_sale_id(conn, sale_id)
+        if resolved_id is None:
+            return False
+        sale = conn.execute("SELECT id FROM sales WHERE id = ?", (resolved_id,)).fetchone()
         if not sale:
             return False
         set_clause = ", ".join(f"{k} = ?" for k in updates)
-        values = list(updates.values()) + [sale_id]
+        values = list(updates.values()) + [resolved_id]
         conn.execute(f"UPDATE sales SET {set_clause} WHERE id = ?", values)
         if "payment_status" in updates:
             account = conn.execute(
-                "SELECT account_id FROM sales WHERE id = ?", (sale_id,)
+                "SELECT account_id FROM sales WHERE id = ?", (resolved_id,)
             ).fetchone()
             if account:
                 status_map = {"paid": "sold", "pending": "pending_payment"}
@@ -274,12 +299,15 @@ def update_sale(sale_id, **fields):
 def void_sale(sale_id):
     conn = connect()
     try:
+        resolved_id = _resolve_sale_id(conn, sale_id)
+        if resolved_id is None:
+            return False
         sale = conn.execute(
-            "SELECT account_id FROM sales WHERE id = ?", (sale_id,)
+            "SELECT account_id FROM sales WHERE id = ?", (resolved_id,)
         ).fetchone()
         if not sale:
             return False
-        conn.execute("DELETE FROM sales WHERE id = ?", (sale_id,))
+        conn.execute("DELETE FROM sales WHERE id = ?", (resolved_id,))
         conn.execute(
             "UPDATE accounts SET status = 'available' WHERE id = ?",
             (sale["account_id"],),
@@ -298,10 +326,11 @@ def create_draft_sale(account_id, seller_id):
         ).fetchone()
         if existing:
             return existing["id"]
+        sale_code = _generate_sale_code()
         cursor = conn.execute(
-            """INSERT INTO sales (account_id, seller_id, buyer_name, price, payment_status, notes)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (account_id, seller_id, "Unknown", 0, "pending", None),
+            """INSERT INTO sales (account_id, seller_id, buyer_name, price, payment_status, notes, sale_code)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (account_id, seller_id, "Unknown", 0, "pending", None, sale_code),
         )
         conn.commit()
         return cursor.lastrowid

@@ -13,30 +13,33 @@ async def notify_admin(context, message):
 
 
 def fmt_sale_notification(sale):
+    sale_code = sale.get("sale_code", f"#{sale['id']}")
     return (
-        f"💰 New sale! #{sale['id']} — "
+        f"💰 New sale! {sale_code} — "
         f"{sale['buyer_name']} — ₹{sale['price']:.0f} — "
         f"by {sale.get('seller_name', '—')}"
     )
 
 
 def fmt_payment_notification(sale):
+    sale_code = sale.get("sale_code", f"#{sale['id']}")
     return (
-        f"✅ Payment received! Sale #{sale['id']} — "
+        f"✅ Payment received! {sale_code} — "
         f"₹{sale['price']:.0f} from {sale['buyer_name']}"
     )
 
 
 def fmt_high_value_notification(sale):
+    sale_code = sale.get("sale_code", f"#{sale['id']}")
     return (
-        f"🔥 High-value sale! #{sale['id']} — "
+        f"🔥 High-value sale! {sale_code} — "
         f"₹{sale['price']:.0f} from {sale['buyer_name']} — "
         f"by {sale.get('seller_name', '—')}"
     )
 
 
-def fmt_void_notification(sale_id):
-    return f"♻️ Sale #{sale_id} voided — account returned to stock"
+def fmt_void_notification(sale_code):
+    return f"♻️ {sale_code} voided — account returned to stock"
 
 
 def fmt_seller_added(name, user_id):

@@ -96,9 +96,10 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         new_status = "paid" if _d(sale).get("payment_status") == "pending" else "pending"
         mark_payment(sale_id, new_status)
         label = "paid" if new_status == "paid" else "pending"
-        await query.edit_message_text(f"✅ Sale #{sale_id} marked as {label}.")
+        sale_code = _d(sale).get("sale_code", f"#{sale_id}")
+        await query.edit_message_text(f"✅ {sale_code} marked as {label}.")
         if new_status == "paid":
-            await notify_admin(context, f"✅ Payment received! Sale #{sale_id} — ₹{_d(sale).get('price', 0):.0f} from {_d(sale).get('buyer_name')}")
+            await notify_admin(context, f"✅ Payment received! {sale_code} — ₹{_d(sale).get('price', 0):.0f} from {_d(sale).get('buyer_name')}")
         return True
 
     if data.startswith("marksaleunsold:"):
@@ -159,7 +160,8 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             await query.edit_message_text("🔍 Sale not found.")
             return True
         mark_payment(sale_id, "pending")
-        await query.edit_message_text(f"✅ Sale #{sale_id} marked as 🟡 pending payment.")
+        sale_code = _d(sale).get("sale_code", f"#{sale_id}")
+        await query.edit_message_text(f"✅ {sale_code} marked as 🟡 pending payment.")
         return True
 
     if data.startswith("voidconfirm:"):
@@ -170,10 +172,12 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         except ValueError:
             return True
         state.pop(user_id, "void_confirm", None)
+        sale = get_sale_by_id(sale_id)
+        sale_code = _d(sale).get("sale_code", f"#{sale_id}") if sale else f"#{sale_id}"
         success = void_sale(sale_id)
         if success:
-            await query.edit_message_text(f"✅ Sale #{sale_id} voided. Account returned to available stock.")
-            await notify_admin(context, fmt_void_notification(sale_id))
+            await query.edit_message_text(f"✅ {sale_code} voided. Account returned to available stock.")
+            await notify_admin(context, fmt_void_notification(sale_code))
         else:
             await query.edit_message_text("❌ Failed to void sale.")
         return True
@@ -271,11 +275,15 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
                     failed.append(sid)
         parts = []
         if updated:
-            detail = ", ".join(f"#{i}" for i in updated)
             field_names = set()
             for fields in pending.values():
                 field_names.update(fields.keys())
-            parts.append(f"✏️ Updated {detail}: {', '.join(field_names)}")
+            sale = get_sale_by_id(updated[0])
+            sale_code = _d(sale).get("sale_code", f"#{updated[0]}") if sale else f"#{updated[0]}"
+            if len(updated) > 1:
+                parts.append(f"✏️ Updated {len(updated)} sales: {', '.join(field_names)}")
+            else:
+                parts.append(f"✏️ Updated {sale_code}: {', '.join(field_names)}")
         if failed:
             parts.append(f"⚠️ Failed: {', '.join(str(i) for i in failed)}")
         await query.edit_message_text("\n".join(parts))

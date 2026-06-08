@@ -137,6 +137,25 @@ def migrate(conn, current_version):
         conn.commit()
         logger.info("Migration to V4 complete.")
 
+    if current_version < 5:
+        logger.info("Migrating schema from V4 to V5...")
+        try:
+            conn.execute("ALTER TABLE sales ADD COLUMN sale_code TEXT")
+            rows = conn.execute("SELECT id FROM sales WHERE sale_code IS NULL").fetchall()
+            for row in rows:
+                code = "SALE-" + "".join(
+                    __import__("secrets").choice(
+                        __import__("string").ascii_uppercase + __import__("string").digits
+                    )
+                    for _ in range(8)
+                )
+                conn.execute("UPDATE sales SET sale_code = ? WHERE id = ?", (code, row["id"]))
+        except sqlite3.OperationalError as e:
+            logger.warning("V5 migration partial: %s", e)
+        set_schema_version(conn, 5)
+        conn.commit()
+        logger.info("Migration to V5 complete.")
+
 
 def init_db():
     conn = connect()
@@ -185,6 +204,7 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS sales (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sale_code TEXT UNIQUE NOT NULL,
             account_id INTEGER NOT NULL UNIQUE,
             seller_id INTEGER,
             buyer_name TEXT NOT NULL DEFAULT 'Unknown',
