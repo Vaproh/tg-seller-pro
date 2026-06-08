@@ -205,7 +205,11 @@ Lets you change buyer, price, payment status, or notes on existing sales.
    • 📝 Notes — type new notes
 3. Tap ✅ Done when finished
 
+<b>Works with incomplete sales:</b>
+If an account was marked as sold directly (via /marksold) without buyer/price info, /editsale will create a draft sale record so you can fill in the details.
+
 <b>Notes:</b>
+- Accepts both sale IDs and account IDs
 - Changes apply to all IDs at once
 - Status change auto-updates account status
 - Pending changes shown before applying""",

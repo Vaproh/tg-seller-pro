@@ -17,7 +17,7 @@ from database import (
     get_seller_by_user_id, get_buyer_names, set_account_status,
     get_account_by_id,
 )
-from database.sales import update_sale
+from database.sales import update_sale, create_draft_sale
 from utils.notifications import (
     notify_admin, fmt_sale_notification, fmt_payment_notification,
     fmt_high_value_notification, fmt_void_notification,
@@ -312,42 +312,63 @@ async def editsale_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📝 Usage: /editsale <id,id,...>")
         return
     ids = [x.strip() for x in args[0].split(",") if x.strip()]
-    sale_ids = []
+    raw_ids = []
     for id_str in ids:
         try:
-            sale_ids.append(int(id_str))
+            raw_ids.append(int(id_str))
         except ValueError:
             pass
-    if not sale_ids:
-        await update.message.reply_text("⚠️ No valid sale IDs.")
+    if not raw_ids:
+        await update.message.reply_text("⚠️ No valid IDs.")
         return
+    user_id = update.effective_user.id
+    seller = get_seller_by_user_id(user_id)
+    seller_id = seller["id"] if seller else None
     valid_sales = []
     invalid_ids = []
-    for sid in sale_ids:
-        sale = get_sale_by_id(sid)
+    created_drafts = []
+    for rid in raw_ids:
+        sale = get_sale_by_id(rid)
         if sale:
             valid_sales.append(_d(sale))
+            continue
+        account = get_account_by_id(rid)
+        if account and _d(account).get("status") in ("sold", "pending_payment"):
+            draft_id = create_draft_sale(rid, seller_id)
+            if draft_id:
+                sale = get_sale_by_id(draft_id)
+                if sale:
+                    valid_sales.append(_d(sale))
+                    created_drafts.append(rid)
+                else:
+                    invalid_ids.append(rid)
+            else:
+                invalid_ids.append(rid)
         else:
-            invalid_ids.append(sid)
+            invalid_ids.append(rid)
     if not valid_sales:
-        await update.message.reply_text(f"⚠️ Sales not found: {', '.join(str(i) for i in invalid_ids)}")
+        await update.message.reply_text(f"⚠️ Not found: {', '.join(str(i) for i in invalid_ids)}")
         return
-    state.set(update.effective_user.id, "editsale_ids", [s["id"] for s in valid_sales])
-    state.set(update.effective_user.id, "editsale_pending", {})
-    text = _editsale_summary(valid_sales, invalid_ids)
+    state.set(user_id, "editsale_ids", [s["id"] for s in valid_sales])
+    state.set(user_id, "editsale_pending", {})
+    text = _editsale_summary(valid_sales, invalid_ids, created_drafts)
     kb = _editsale_field_keyboard()
     await update.message.reply_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
 
 
-def _editsale_summary(sales, invalid_ids=None):
+def _editsale_summary(sales, invalid_ids=None, created_drafts=None):
     text = "<b>✏️ Editing sales:</b>\n\n"
     for s in sales:
         ps = s.get("payment_status", "pending")
         ps_emoji = "✅" if ps == "paid" else "🟡"
+        buyer = esc(s.get("buyer_name")) or "—"
+        price = s.get("price", 0) or 0
         text += (
-            f"• #{s['id']} | {esc(s.get('buyer_name'))} | "
-            f"₹{s.get('price', 0):.0f} | {ps_emoji} {esc(ps)}\n"
+            f"• #{s['id']} | {buyer} | "
+            f"₹{price:.0f} | {ps_emoji} {esc(ps)}\n"
         )
+    if created_drafts:
+        text += f"\n📝 Created draft sale for account(s): {', '.join(str(i) for i in created_drafts)}"
     if invalid_ids:
         text += f"\n⚠️ Not found: {', '.join(str(i) for i in invalid_ids)}"
     return text

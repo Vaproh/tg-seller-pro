@@ -288,3 +288,22 @@ def void_sale(sale_id):
         return True
     finally:
         conn.close()
+
+
+def create_draft_sale(account_id, seller_id):
+    conn = connect()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM sales WHERE account_id = ?", (account_id,)
+        ).fetchone()
+        if existing:
+            return existing["id"]
+        cursor = conn.execute(
+            """INSERT INTO sales (account_id, seller_id, buyer_name, price, payment_status, notes)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (account_id, seller_id, "Unknown", 0, "pending", None),
+        )
+        conn.commit()
+        return cursor.lastrowid
+    finally:
+        conn.close()
