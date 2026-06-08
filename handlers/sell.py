@@ -309,11 +309,7 @@ async def editsale_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     args = context.args
     if not args:
-        await update.message.reply_text(
-            "📝 Usage: /editsale <id,id,...>\n\n"
-            "Then reply with edits in format:\n"
-            "buyer New Name\nprice 150\nstatus paid\nnotes some note"
-        )
+        await update.message.reply_text("📝 Usage: /editsale <id,id,...>")
         return
     ids = [x.strip() for x in args[0].split(",") if x.strip()]
     sale_ids = []
@@ -325,15 +321,50 @@ async def editsale_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not sale_ids:
         await update.message.reply_text("⚠️ No valid sale IDs.")
         return
-    state.set(update.effective_user.id, "editsale_ids", sale_ids)
-    state.set(update.effective_user.id, "editsale_stage", "awaiting_fields")
-    preview = "\n".join(f"• #{sid}" for sid in sale_ids)
-    await update.message.reply_text(
-        f"✏️ Editing sales:\n{preview}\n\n"
-        "Reply with fields to update (one per line):\n"
-        "• <code>buyer New Name</code>\n"
-        "• <code>price 150</code>\n"
-        "• <code>status paid</code> (paid/pending)\n"
-        "• <code>notes some note</code>",
-        parse_mode="HTML",
-    )
+    valid_sales = []
+    invalid_ids = []
+    for sid in sale_ids:
+        sale = get_sale_by_id(sid)
+        if sale:
+            valid_sales.append(_d(sale))
+        else:
+            invalid_ids.append(sid)
+    if not valid_sales:
+        await update.message.reply_text(f"⚠️ Sales not found: {', '.join(str(i) for i in invalid_ids)}")
+        return
+    state.set(update.effective_user.id, "editsale_ids", [s["id"] for s in valid_sales])
+    state.set(update.effective_user.id, "editsale_pending", {})
+    text = _editsale_summary(valid_sales, invalid_ids)
+    kb = _editsale_field_keyboard()
+    await update.message.reply_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+
+
+def _editsale_summary(sales, invalid_ids=None):
+    text = "<b>✏️ Editing sales:</b>\n\n"
+    for s in sales:
+        ps = s.get("payment_status", "pending")
+        ps_emoji = "✅" if ps == "paid" else "🟡"
+        text += (
+            f"• #{s['id']} | {esc(s.get('buyer_name'))} | "
+            f"₹{s.get('price', 0):.0f} | {ps_emoji} {esc(ps)}\n"
+        )
+    if invalid_ids:
+        text += f"\n⚠️ Not found: {', '.join(str(i) for i in invalid_ids)}"
+    return text
+
+
+def _editsale_field_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("👤 Buyer", callback_data="editsale:field:buyer"),
+            InlineKeyboardButton("💰 Price", callback_data="editsale:field:price"),
+        ],
+        [
+            InlineKeyboardButton("📦 Status", callback_data="editsale:field:status"),
+            InlineKeyboardButton("📝 Notes", callback_data="editsale:field:notes"),
+        ],
+        [
+            InlineKeyboardButton("✅ Done", callback_data="editsale:done"),
+            InlineKeyboardButton("❌ Cancel", callback_data="editsale:cancel"),
+        ],
+    ])

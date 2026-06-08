@@ -280,6 +280,47 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("\n".join(parts))
         return
 
+    editsale_field = state.get(user_id, "editsale_field")
+    if editsale_field in ("buyer", "price", "notes"):
+        sale_ids = state.get(user_id, "editsale_ids", [])
+        pending = state.get(user_id, "editsale_pending", {})
+        if editsale_field == "buyer":
+            if len(text) > config.MAX_BUYER_LEN:
+                await update.message.reply_text(f"⚠️ Buyer name too long (max {config.MAX_BUYER_LEN} chars).")
+                return
+            value = text
+        elif editsale_field == "price":
+            try:
+                value = float(text.replace("₹", "").replace(",", ""))
+            except ValueError:
+                await update.message.reply_text("⚠️ Enter a valid price:")
+                return
+        elif editsale_field == "notes":
+            value = None if text.lower() == "/clear" else text
+        else:
+            return
+        for sid in sale_ids:
+            if sid not in pending:
+                pending[sid] = {}
+            pending[sid][editsale_field] = value
+        state.set(user_id, "editsale_pending", pending)
+        state.pop(user_id, "editsale_field")
+        from handlers.sell import _editsale_summary, _editsale_field_keyboard
+        sales = []
+        for sid in sale_ids:
+            sale = get_sale_by_id(sid)
+            if sale:
+                s = _d(sale)
+                if s["id"] in pending:
+                    s.update(pending[s["id"]])
+                sales.append(s)
+        display_value = value if value is not None else "(cleared)"
+        text_msg = _editsale_summary(sales)
+        text_msg += f"\n\n✅ Set {editsale_field} → <code>{esc(str(display_value))}</code> for all {len(sale_ids)} sale(s)"
+        kb = _editsale_field_keyboard()
+        await update.message.reply_text(_truncate(text_msg), parse_mode="HTML", reply_markup=kb)
+        return
+
     if sell_stage == "price":
         try:
             price = float(text.replace("₹", "").replace(",", ""))
