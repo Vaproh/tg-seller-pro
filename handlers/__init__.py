@@ -26,6 +26,7 @@ from handlers.callbacks import handle_callback
 from handlers.messages import handle_text, handle_csv_upload
 from handlers.errors import error_handler
 from handlers.help import help_command
+from handlers.command_logger import log_command
 
 logger = logging.getLogger(__name__)
 
@@ -82,5 +83,9 @@ def register_handlers(application: Application):
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     application.add_error_handler(error_handler)
+
+    application.add_handler(
+        MessageHandler(filters.COMMAND, log_command), group=-1
+    )
 
     logger.info("All handlers registered.")
