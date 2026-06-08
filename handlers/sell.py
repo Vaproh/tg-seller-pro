@@ -14,8 +14,10 @@ from core.filters import (
 from database import (
     sell_account, bulk_sell_accounts, mark_payment, get_sales, count_sales,
     get_sale_by_id, void_sale, list_accounts, count_accounts,
-    get_seller_by_user_id, get_buyer_names,
+    get_seller_by_user_id, get_buyer_names, set_account_status,
+    get_account_by_id,
 )
+from database.sales import update_sale
 from utils.notifications import (
     notify_admin, fmt_sale_notification, fmt_payment_notification,
     fmt_high_value_notification, fmt_void_notification,
@@ -160,22 +162,28 @@ async def voidsale_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     args = context.args
     if not args:
-        await update.message.reply_text("📝 Usage: /voidsale <sale_id>")
+        await update.message.reply_text("📝 Usage: /voidsale <id,id,...>")
         return
-    try:
-        sale_id = int(args[0])
-    except ValueError:
-        await update.message.reply_text("⚠️ Invalid sale ID.")
-        return
-    sale = get_sale_by_id(sale_id)
-    if not sale:
-        await update.message.reply_text("🔍 Sale not found.")
-        return
-    state.set(update.effective_user.id, "void_confirm", sale_id)
-    await update.message.reply_text(
-        f"⚠️ Void sale #{sale_id}? Account will return to available stock.",
-        reply_markup=confirm_keyboard(f"voidconfirm:{sale_id}", "voidcancel"),
-    )
+    ids = [x.strip() for x in args[0].split(",") if x.strip()]
+    valid, invalid = [], []
+    for id_str in ids:
+        try:
+            sale_id = int(id_str)
+        except ValueError:
+            invalid.append(id_str)
+            continue
+        sale = get_sale_by_id(sale_id)
+        if not sale:
+            invalid.append(id_str)
+            continue
+        void_sale(sale_id)
+        valid.append(sale_id)
+    parts = []
+    if valid:
+        parts.append(f"♻️ Voided: {', '.join(str(i) for i in valid)}")
+    if invalid:
+        parts.append(f"⚠️ Not found: {', '.join(invalid)}")
+    await update.message.reply_text("\n".join(parts))
 
 
 async def marksold_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -183,20 +191,28 @@ async def marksold_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     args = context.args
     if not args:
-        await update.message.reply_text("📝 Usage: /marksold <account_id>")
+        await update.message.reply_text("📝 Usage: /marksold <id,id,...>")
         return
-    try:
-        account_id = int(args[0])
-    except ValueError:
-        await update.message.reply_text("⚠️ Invalid account ID.")
-        return
-    from database import set_account_status, get_account_by_id
-    account = get_account_by_id(account_id)
-    if not account:
-        await update.message.reply_text("🔍 Account not found.")
-        return
-    set_account_status(account_id, "sold")
-    await update.message.reply_text(f"✅ Account #{account_id} marked as 🔴 sold.")
+    ids = [x.strip() for x in args[0].split(",") if x.strip()]
+    valid, invalid = [], []
+    for id_str in ids:
+        try:
+            account_id = int(id_str)
+        except ValueError:
+            invalid.append(id_str)
+            continue
+        account = get_account_by_id(account_id)
+        if not account:
+            invalid.append(id_str)
+            continue
+        set_account_status(account_id, "sold")
+        valid.append(account_id)
+    parts = []
+    if valid:
+        parts.append(f"🔴 Sold: {', '.join(str(i) for i in valid)}")
+    if invalid:
+        parts.append(f"⚠️ Not found: {', '.join(invalid)}")
+    await update.message.reply_text("\n".join(parts))
 
 
 async def markunsold_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -204,20 +220,28 @@ async def markunsold_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     args = context.args
     if not args:
-        await update.message.reply_text("📝 Usage: /markunsold <account_id>")
+        await update.message.reply_text("📝 Usage: /markunsold <id,id,...>")
         return
-    try:
-        account_id = int(args[0])
-    except ValueError:
-        await update.message.reply_text("⚠️ Invalid account ID.")
-        return
-    from database import set_account_status, get_account_by_id
-    account = get_account_by_id(account_id)
-    if not account:
-        await update.message.reply_text("🔍 Account not found.")
-        return
-    set_account_status(account_id, "available")
-    await update.message.reply_text(f"✅ Account #{account_id} marked as 🟢 available.")
+    ids = [x.strip() for x in args[0].split(",") if x.strip()]
+    valid, invalid = [], []
+    for id_str in ids:
+        try:
+            account_id = int(id_str)
+        except ValueError:
+            invalid.append(id_str)
+            continue
+        account = get_account_by_id(account_id)
+        if not account:
+            invalid.append(id_str)
+            continue
+        set_account_status(account_id, "available")
+        valid.append(account_id)
+    parts = []
+    if valid:
+        parts.append(f"🟢 Available: {', '.join(str(i) for i in valid)}")
+    if invalid:
+        parts.append(f"⚠️ Not found: {', '.join(invalid)}")
+    await update.message.reply_text("\n".join(parts))
 
 
 async def markpendingpayment_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -225,20 +249,28 @@ async def markpendingpayment_cmd(update: Update, context: ContextTypes.DEFAULT_T
         return
     args = context.args
     if not args:
-        await update.message.reply_text("📝 Usage: /markpendingpayment <account_id>")
+        await update.message.reply_text("📝 Usage: /markpendingpayment <id,id,...>")
         return
-    try:
-        account_id = int(args[0])
-    except ValueError:
-        await update.message.reply_text("⚠️ Invalid account ID.")
-        return
-    from database import set_account_status, get_account_by_id
-    account = get_account_by_id(account_id)
-    if not account:
-        await update.message.reply_text("🔍 Account not found.")
-        return
-    set_account_status(account_id, "pending_payment")
-    await update.message.reply_text(f"✅ Account #{account_id} marked as 🟡 pending payment.")
+    ids = [x.strip() for x in args[0].split(",") if x.strip()]
+    valid, invalid = [], []
+    for id_str in ids:
+        try:
+            account_id = int(id_str)
+        except ValueError:
+            invalid.append(id_str)
+            continue
+        account = get_account_by_id(account_id)
+        if not account:
+            invalid.append(id_str)
+            continue
+        set_account_status(account_id, "pending_payment")
+        valid.append(account_id)
+    parts = []
+    if valid:
+        parts.append(f"🟡 Pending: {', '.join(str(i) for i in valid)}")
+    if invalid:
+        parts.append(f"⚠️ Not found: {', '.join(invalid)}")
+    await update.message.reply_text("\n".join(parts))
 
 
 def _fmt_sales_page(sales, page, total_pages):
@@ -270,3 +302,38 @@ def _sales_keyboard(page, total_pages, prefix="salesfilter"):
     if page < total_pages:
         nav_row.append(InlineKeyboardButton("➡️", callback_data=f"{prefix}page:{page + 1}"))
     return InlineKeyboardMarkup([filter_row, nav_row])
+
+
+async def editsale_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_seller(update):
+        return
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "📝 Usage: /editsale <id,id,...>\n\n"
+            "Then reply with edits in format:\n"
+            "buyer New Name\nprice 150\nstatus paid\nnotes some note"
+        )
+        return
+    ids = [x.strip() for x in args[0].split(",") if x.strip()]
+    sale_ids = []
+    for id_str in ids:
+        try:
+            sale_ids.append(int(id_str))
+        except ValueError:
+            pass
+    if not sale_ids:
+        await update.message.reply_text("⚠️ No valid sale IDs.")
+        return
+    state.set(update.effective_user.id, "editsale_ids", sale_ids)
+    state.set(update.effective_user.id, "editsale_stage", "awaiting_fields")
+    preview = "\n".join(f"• #{sid}" for sid in sale_ids)
+    await update.message.reply_text(
+        f"✏️ Editing sales:\n{preview}\n\n"
+        "Reply with fields to update (one per line):\n"
+        "• <code>buyer New Name</code>\n"
+        "• <code>price 150</code>\n"
+        "• <code>status paid</code> (paid/pending)\n"
+        "• <code>notes some note</code>",
+        parse_mode="HTML",
+    )

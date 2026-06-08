@@ -12,6 +12,7 @@ from handlers.sell import (
     sell_cmd, bulksell_cmd, sales_cmd, sale_cmd,
     markpaid_cmd, voidsale_cmd,
     marksold_cmd, markunsold_cmd, markpendingpayment_cmd,
+    editsale_cmd,
 )
 from handlers.preview import preview_cmd
 from handlers.search import search_cmd
@@ -52,6 +53,7 @@ def register_handlers(application: Application):
     application.add_handler(CommandHandler("marksold", marksold_cmd))
     application.add_handler(CommandHandler("markunsold", markunsold_cmd))
     application.add_handler(CommandHandler("markpendingpayment", markpendingpayment_cmd))
+    application.add_handler(CommandHandler("editsale", editsale_cmd))
 
     application.add_handler(CommandHandler("preview", preview_cmd))
     application.add_handler(CommandHandler("search", search_cmd))

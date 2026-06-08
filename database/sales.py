@@ -240,6 +240,37 @@ def get_sales_summary(seller_id=None, period=None):
         conn.close()
 
 
+def update_sale(sale_id, **fields):
+    allowed = {"buyer_name", "price", "payment_status", "notes"}
+    updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
+    if not updates:
+        return False
+    conn = connect()
+    try:
+        sale = conn.execute("SELECT id FROM sales WHERE id = ?", (sale_id,)).fetchone()
+        if not sale:
+            return False
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [sale_id]
+        conn.execute(f"UPDATE sales SET {set_clause} WHERE id = ?", values)
+        if "payment_status" in updates:
+            account = conn.execute(
+                "SELECT account_id FROM sales WHERE id = ?", (sale_id,)
+            ).fetchone()
+            if account:
+                status_map = {"paid": "sold", "pending": "pending_payment"}
+                new_status = status_map.get(updates["payment_status"])
+                if new_status:
+                    conn.execute(
+                        "UPDATE accounts SET status = ? WHERE id = ?",
+                        (new_status, account["account_id"]),
+                    )
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
 def void_sale(sale_id):
     conn = connect()
     try:

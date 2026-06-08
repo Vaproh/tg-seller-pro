@@ -15,6 +15,7 @@ from database import (
     list_accounts, sell_account, get_category_name,
     delete_account, delete_accounts_by_ids, get_buyer_names,
 )
+from database.sales import update_sale, get_sale_by_id
 from utils.parsers import parse_bulk_lines, parse_csv_file
 from utils.csv_utils import detect_columns, build_accounts_from_csv
 from utils.notifications import notify_admin, fmt_bulk_import
@@ -228,6 +229,55 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state.set(user_id, "sell_buyer", text)
         state.set(user_id, "sell_stage", "price")
         await update.message.reply_text(f"👤 Buyer: {esc(text)}\n\n💰 Enter price (₹):")
+        return
+
+    # ── Edit sale flow ─────────────────────────────────────
+    editsale_stage = state.get(user_id, "editsale_stage")
+    if editsale_stage == "awaiting_fields":
+        sale_ids = state.get(user_id, "editsale_ids", [])
+        state.pop(user_id, "editsale_ids")
+        state.pop(user_id, "editsale_stage")
+        fields = {}
+        for line in text.strip().splitlines():
+            line = line.strip()
+            if not line or " " not in line:
+                continue
+            key, _, value = line.partition(" ")
+            key = key.lower().strip()
+            value = value.strip()
+            if key in ("buyer", "buyer_name"):
+                fields["buyer_name"] = value
+            elif key == "price":
+                try:
+                    fields["price"] = float(value.replace("₹", "").replace(",", ""))
+                except ValueError:
+                    pass
+            elif key in ("status", "payment_status", "paystatus"):
+                if value.lower() in ("paid", "pending"):
+                    fields["payment_status"] = value.lower()
+            elif key == "notes":
+                fields["notes"] = value
+        if not fields:
+            await update.message.reply_text("⚠️ No valid fields found. Use format: <code>key value</code>", parse_mode="HTML")
+            return
+        updated, failed = [], []
+        for sid in sale_ids:
+            sale = get_sale_by_id(sid)
+            if not sale:
+                failed.append(sid)
+                continue
+            if update_sale(sid, **fields):
+                updated.append(sid)
+            else:
+                failed.append(sid)
+        parts = []
+        if updated:
+            detail = ", ".join(f"#{i}" for i in updated)
+            field_names = ", ".join(fields.keys())
+            parts.append(f"✏️ Updated {detail}: {field_names}")
+        if failed:
+            parts.append(f"⚠️ Failed: {', '.join(str(i) for i in failed)}")
+        await update.message.reply_text("\n".join(parts))
         return
 
     if sell_stage == "price":
