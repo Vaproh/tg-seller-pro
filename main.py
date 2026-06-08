@@ -3,6 +3,7 @@ import sys
 import signal
 import logging
 from logging.handlers import RotatingFileHandler
+from telegram import BotCommand
 from telegram.ext import Application
 import config
 from database import init_db
@@ -50,6 +51,42 @@ async def post_init(application):
     from utils.scheduler import setup_scheduler
     setup_scheduler(application)
     logger.info("Scheduler started.")
+
+    commands = [
+        BotCommand("start", "Start the bot"),
+        BotCommand("help", "Show help"),
+        BotCommand("mainmenu", "Show main menu"),
+        BotCommand("ping", "Health check"),
+        BotCommand("add", "Add single account (admin)"),
+        BotCommand("bulkadd", "Bulk import accounts (admin)"),
+        BotCommand("extractcsv", "Import from CSV (admin)"),
+        BotCommand("list", "Browse accounts"),
+        BotCommand("search", "Search accounts"),
+        BotCommand("getid", "View account by ID"),
+        BotCommand("sell", "Sell an account"),
+        BotCommand("bulksell", "Bulk sell accounts"),
+        BotCommand("sales", "View sales"),
+        BotCommand("sale", "Sale detail"),
+        BotCommand("markpaid", "Toggle payment status"),
+        BotCommand("voidsale", "Void a sale (admin)"),
+        BotCommand("preview", "Preview accounts for buyer"),
+        BotCommand("categories", "List categories"),
+        BotCommand("addcategory", "Create category (admin)"),
+        BotCommand("deletecategory", "Delete category (admin)"),
+        BotCommand("inventory", "Stock overview"),
+        BotCommand("buyers", "List buyers"),
+        BotCommand("buyer", "Buyer purchase history"),
+        BotCommand("report", "Revenue reports (admin)"),
+        BotCommand("addseller", "Register seller (admin)"),
+        BotCommand("removeseller", "Remove seller (admin)"),
+        BotCommand("listsellers", "List all sellers (admin)"),
+        BotCommand("export", "Export accounts CSV (admin)"),
+        BotCommand("backup", "Download DB backup (admin)"),
+        BotCommand("delete", "Delete account (admin)"),
+        BotCommand("bulkdelete", "Bulk delete (admin)"),
+    ]
+    await application.bot.set_my_commands(commands)
+    logger.info("Bot commands registered with Telegram.")
 
 
 def main():
