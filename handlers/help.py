@@ -6,27 +6,45 @@ from core.help_content import HELP_MAIN_ADMIN, HELP_MAIN_SELLER, HELP_TOPICS
 
 
 TOPIC_EMOJIS = {
-    "sell": "💰",
-    "status": "📊",
-    "filter": "🔍",
-    "search": "🔎",
-    "add": "➕",
-    "delete": "🗑️",
-    "preview": "📂",
-    "categories": "📂",
-    "sales": "📈",
-    "inventory": "📦",
-    "buyers": "👥",
-    "reports": "📊",
-    "sellers": "👤",
-    "settings": "⚙️",
+    "sell": "💰", "bulksell": "💰", "sales": "📈", "sale": "🧾",
+    "markpaid": "💳", "marksold": "🔴", "markunsold": "🟢",
+    "markpendingpayment": "🟡", "voidsale": "♻️",
+    "list": "📋", "search": "🔎", "getid": "🔍",
+    "add": "➕", "bulkadd": "📥", "extractcsv": "📄",
+    "delete": "🗑️", "bulkdelete": "🗑️",
+    "preview": "📂", "categories": "📂", "addcategory": "➕",
+    "deletecategory": "🗑️",
+    "inventory": "📦", "buyers": "👥", "buyer": "👤",
+    "report": "📊", "addseller": "👤", "removeseller": "🚫",
+    "listsellers": "👥", "export": "📤", "backup": "💾",
+    "ping": "🏓", "status": "📊", "filter": "🔍", "settings": "⚙️",
+}
+
+COMMAND_TO_TOPIC = {
+    "sell": "sell", "bulksell": "bulksell", "sales": "sales", "sale": "sale",
+    "markpaid": "markpaid", "marksold": "marksold", "markunsold": "markunsold",
+    "markpendingpayment": "markpendingpayment", "voidsale": "voidsale",
+    "list": "list", "search": "search", "getid": "getid",
+    "add": "add", "bulkadd": "bulkadd", "extractcsv": "extractcsv",
+    "delete": "delete", "bulkdelete": "bulkdelete",
+    "preview": "preview", "categories": "categories", "addcategory": "addcategory",
+    "deletecategory": "deletecategory",
+    "inventory": "inventory", "buyers": "buyers", "buyer": "buyer",
+    "report": "report", "addseller": "addseller", "removeseller": "removeseller",
+    "listsellers": "listsellers", "export": "export", "backup": "backup",
+    "ping": "ping",
 }
 
 
 def _topics_keyboard():
     buttons = []
     row = []
-    for topic in sorted(HELP_TOPICS.keys()):
+    topics = ["sell", "bulksell", "list", "search", "add", "delete",
+              "status", "filter", "preview", "inventory",
+              "sales", "buyers", "categories", "settings"]
+    for topic in topics:
+        if topic not in HELP_TOPICS:
+            continue
         emoji = TOPIC_EMOJIS.get(topic, "📖")
         row.append(InlineKeyboardButton(
             f"{emoji} {topic.title()}",
@@ -50,7 +68,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         kb = _topics_keyboard()
         await update.message.reply_text(text, parse_mode="HTML", reply_markup=kb)
         return
-    topic = args[0].lower().lstrip("/")
+    cmd = args[0].lower().lstrip("/")
+    topic = COMMAND_TO_TOPIC.get(cmd, cmd)
     if topic in HELP_TOPICS:
         emoji = TOPIC_EMOJIS.get(topic, "📖")
         kb = _topics_keyboard()
@@ -58,7 +77,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         kb = _topics_keyboard()
         await update.message.reply_text(
-            f"⚠️ Unknown topic: {esc(topic)}\n\nTap a topic below:",
+            f"⚠️ No help for '{esc(cmd)}'.\n\nTap a topic below:",
             parse_mode="HTML",
             reply_markup=kb,
         )

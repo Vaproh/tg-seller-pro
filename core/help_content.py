@@ -42,7 +42,10 @@ HELP_MAIN_ADMIN = """<b>📖 Help — Admin</b>
 /export — Download Excel file
 /backup — Download database
 /ping — Check if bot works
-/help — This menu"""
+/help — This menu
+
+Type <b>/help command</b> for details on any command.
+Example: <b>/help sell</b>"""
 
 HELP_MAIN_SELLER = """<b>📖 Help — Seller</b>
 
@@ -70,23 +73,361 @@ HELP_MAIN_SELLER = """<b>📖 Help — Seller</b>
 
 <b>⚙️ Tools</b>
 /ping — Check if bot works
-/help — This menu"""
+/help — This menu
+
+Type <b>/help command</b> for details on any command.
+Example: <b>/help sell</b>"""
 
 HELP_TOPICS = {
-    "sell": """<b>💰 How to Sell</b>
+    "sell": """<b>💰 /sell — Sell One Account</b>
 
-<b>/sell</b> — sell one account
-1. Pick an available account
-2. Pick buyer (or type name)
-3. Type the price
-4. Pick: 🟢 Sold or 🟡 Waiting for money
-5. Done! Receipt sent
+<b>What it does:</b>
+Lets you sell one account to a buyer.
 
-<b>/bulksell</b> — sell many accounts
-Pick accounts → same steps as above
+<b>How to use:</b>
+1. Type /sell
+2. Pick an available account (🟢)
+3. Pick a buyer or type their name
+4. Type the price
+5. Pick: 🟢 Sold or 🟡 Waiting for money
+6. Confirm
 
-<b>/markpaid</b> — buyer paid? Mark it done
-<b>/voidsale</b> — cancel a sale""",
+<b>Notes:</b>
+- Only 🟢 available accounts show up
+- Price must be typed (no skipping)
+- Buyer names are saved for next time""",
+
+    "bulksell": """<b>💰 /bulksell — Sell Many Accounts</b>
+
+<b>What it does:</b>
+Sell multiple accounts to one buyer at once.
+
+<b>How to use:</b>
+1. Type /bulksell
+2. Pick mode:
+   • <b>Select:</b> tap accounts to pick them
+   • <b>Number:</b> type how many (auto-picks)
+3. Pick buyer
+4. Type price per account
+5. Pick status: 🟢 or 🟡
+6. Confirm""",
+
+    "sales": """<b>📈 /sales — View Sales</b>
+
+<b>What it does:</b>
+Shows all your sales in a list.
+
+<b>How to use:</b>
+Type /sales
+
+<b>Filter by:</b>
+🟡 Pending — waiting for money
+✅ Paid — money received
+📋 All — everything
+
+Use ⬅️ ➡️ to go between pages.""",
+
+    "sale": """<b>🧾 /sale — View One Sale</b>
+
+<b>What it does:</b>
+Shows full details of one sale.
+
+<b>How to use:</b>
+Type /sale 123
+(replace 123 with the sale number)
+
+<b>You can:</b>
+✅ Mark as paid
+🟡 Mark as pending
+🔴 Mark as unsold (cancel)
+♻️ Void (delete sale)""",
+
+    "markpaid": """<b>💳 /markpaid — Mark Payment</b>
+
+<b>What it does:</b>
+Shows pending sales, lets you mark one as paid.
+
+<b>How to use:</b>
+Type /markpaid
+Tap the sale you got paid for""",
+
+    "marksold": """<b>🔴 /marksold — Mark Sold</b>
+
+<b>What it does:</b>
+Marks an account as 🔴 sold.
+
+<b>How to use:</b>
+Type /marksold 123
+(replace 123 with account number)""",
+
+    "markunsold": """<b>🟢 /markunsold — Mark Available</b>
+
+<b>What it does:</b>
+Makes an account available to sell again.
+
+<b>How to use:</b>
+Type /markunsold 123
+(replace 123 with account number)""",
+
+    "markpendingpayment": """<b>🟡 /markpendingpayment — Mark Pending</b>
+
+<b>What it does:</b>
+Marks account as waiting for payment.
+
+<b>How to use:</b>
+Type /markpendingpayment 123
+(replace 123 with account number)""",
+
+    "voidsale": """<b>♻️ /voidsale — Cancel Sale</b>
+
+<b>What it does:</b>
+Deletes a sale. Account goes back to available.
+
+<b>How to use:</b>
+Type /voidsale 123
+(replace 123 with sale number)""",
+
+    "list": """<b>📋 /list — Browse Accounts</b>
+
+<b>What it does:</b>
+Shows all accounts in a list, 5 per page.
+
+<b>How to use:</b>
+Type /list
+
+<b>Filter by:</b>
+🟢 Available — only unsold
+🔴 Sold — only sold
+🟡 Pending — only waiting for money
+📂 Category — pick a category
+🔢 By ID — type account numbers""",
+
+    "search": """<b>🔎 /search — Find Accounts</b>
+
+<b>What it does:</b>
+Search for accounts by different things.
+
+<b>How to use:</b>
+Type /search
+Tap what to search by
+Type your search
+
+<b>Options:</b>
+👤 Username — find by name
+🔑 Password — find by password
+📂 Category — pick a category
+📊 Status — pick 🟢/🔴/🟡
+👤 Buyer — find by buyer name
+📝 Notes — find in notes
+🔍 General — searches everything
+🔢 By ID — type account numbers""",
+
+    "getid": """<b>🔍 /getid — View Account</b>
+
+<b>What it does:</b>
+Shows full details of one account.
+
+<b>How to use:</b>
+Type /getid 123
+(replace 123 with account number)""",
+
+    "add": """<b>➕ /add — Add One Account</b>
+
+<b>What it does:</b>
+Adds one account step by step.
+
+<b>How to use:</b>
+Type /add
+Then follow the steps:
+1. Type username
+2. Type password
+3. Type email (or skip)
+4. Type email password (or skip)
+5. Pick 2FA: Yes/No
+6. Pick verified: Yes/No
+7. Type notes (or skip)
+8. Pick category
+9. Confirm""",
+
+    "bulkadd": """<b>📥 /bulkadd — Add Many Accounts</b>
+
+<b>What it does:</b>
+Add lots of accounts at once.
+
+<b>How to use:</b>
+1. Type /bulkadd
+2. Pick a category
+3. Paste accounts like:
+   user1:pass1
+   user2:pass2
+4. Type /done when finished""",
+
+    "extractcsv": """<b>📄 /extractcsv — Import from Excel</b>
+
+<b>What it does:</b>
+Import accounts from a CSV/Excel file.
+
+<b>How to use:</b>
+1. Type /extractcsv
+2. Pick category
+3. Upload your CSV file
+4. Map the columns:
+   • Tap which column is username
+   • Tap which column is password
+   • Skip or pick email, 2FA, etc.
+5. Preview and confirm""",
+
+    "delete": """<b>🗑️ /delete — Delete Account</b>
+
+<b>What it does:</b>
+Permanently deletes an account.
+
+<b>How to use:</b>
+Option 1: Type /delete 123
+Option 2: Type /delete → pick from list
+
+<b>Bulk delete:</b>
+Type /bulkdelete → type IDs: 1,2,3
+Or type a category name to delete all in it""",
+
+    "bulkdelete": """<b>🗑️ /bulkdelete — Delete Many</b>
+
+<b>What it does:</b>
+Delete multiple accounts at once.
+
+<b>How to use:</b>
+Type /bulkdelete
+Then type:
+• Account numbers: 1,2,3
+• Or a category name (deletes all in it)""",
+
+    "preview": """<b>📂 /preview — Show to Buyer</b>
+
+<b>What it does:</b>
+Pulls accounts to show a buyer.
+
+<b>How to use:</b>
+1. Type /preview
+2. Pick category (or All)
+3. Type how many
+4. Shows accounts with Reddit links
+5. Tap "Sell" to sell one right away""",
+
+    "categories": """<b>📂 /categories — List Categories</b>
+
+<b>What it does:</b>
+Shows all categories with account counts.
+
+<b>How to use:</b>
+Type /categories""",
+
+    "addcategory": """<b>➕ /addcategory — New Category</b>
+
+<b>What it does:</b>
+Creates a new category.
+
+<b>How to use:</b>
+Type /addcategory Food
+(replace Food with your category name)""",
+
+    "deletecategory": """<b>🗑️ /deletecategory — Remove Category</b>
+
+<b>What it does:</b>
+Deletes a category. Accounts in it move to "uncategorized".
+
+<b>How to use:</b>
+Type /deletecategory Food
+(replace Food with the category name)""",
+
+    "inventory": """<b>📦 /inventory — Stock Overview</b>
+
+<b>What it does:</b>
+Shows how many accounts you have.
+
+<b>How to use:</b>
+Type /inventory
+
+Shows:
+🟢 Available count
+🔴 Sold count
+🟡 Waiting for money count
+Per category and total""",
+
+    "buyers": """<b>👥 /buyers — List Buyers</b>
+
+<b>What it does:</b>
+Shows all buyers and how much they spent.
+
+<b>How to use:</b>
+Type /buyers""",
+
+    "buyer": """<b>👤 /buyer — Buyer History</b>
+
+<b>What it does:</b>
+Shows one buyer's purchase history.
+
+<b>How to use:</b>
+Type /buyer John
+(replace John with buyer name)""",
+
+    "report": """<b>📊 /report — Money Report</b>
+
+<b>What it does:</b>
+Shows money made in a time range.
+
+<b>How to use:</b>
+Type /report
+Pick: Today / This Week / This Month / All Time""",
+
+    "addseller": """<b>👤 /addseller — Add Team Member</b>
+
+<b>What it does:</b>
+Lets someone else sell accounts.
+
+<b>How to use:</b>
+Type /addseller 123456 Alice
+(numbers = their Telegram ID, name = their name)""",
+
+    "removeseller": """<b>🚫 /removeseller — Remove Team Member</b>
+
+<b>What it does:</b>
+Stops someone from selling.
+
+<b>How to use:</b>
+Type /removeseller 123456
+(numbers = their Telegram ID)""",
+
+    "listsellers": """<b>👥 /listsellers — See Team</b>
+
+<b>What it does:</b>
+Shows all sellers and their stats.
+
+<b>How to use:</b>
+Type /listsellers""",
+
+    "export": """<b>📤 /export — Download Excel</b>
+
+<b>What it does:</b>
+Downloads all accounts as a CSV file.
+
+<b>How to use:</b>
+Type /export""",
+
+    "backup": """<b>💾 /backup — Download Database</b>
+
+<b>What it does:</b>
+Downloads the entire database as a file.
+
+<b>How to use:</b>
+Type /backup""",
+
+    "ping": """<b>🏓 /ping — Check Bot</b>
+
+<b>What it does:</b>
+Checks if the bot is running.
+
+<b>How to use:</b>
+Type /ping""",
 
     "status": """<b>📊 Account Status</b>
 
@@ -114,92 +455,6 @@ When you see a list, tap a button to filter:
 
 Use ⬅️ ➡️ to move between pages.
 5 accounts per page.""",
-
-    "search": """<b>🔎 How to Search</b>
-
-<b>/search</b> — tap what to search by:
-
-👤 Username — type part of name
-🔑 Password — type part of password
-📂 Category — tap a category
-📊 Status — tap 🟢 or 🔴 or 🟡
-👤 Buyer — type buyer name
-🏷️ Tag — type a tag
-📝 Notes — type what's in notes
-🔍 General — searches everything
-🔢 By ID — type account numbers""",
-
-    "add": """<b>➕ How to Add Accounts</b>
-
-<b>/add</b> — add one:
-Type username → password → email (or skip) → done
-
-<b>/bulkadd</b> — add many:
-Pick category → paste lines like:
-user1:pass1
-user2:pass2
-Then type /done
-
-<b>/extractcsv</b> — import from Excel:
-Pick category → upload file → map columns → done""",
-
-    "delete": """<b>🗑️ How to Delete</b>
-
-<b>/delete</b> — delete one:
-Type /delete 123 (use account number)
-Or just /delete → pick from list
-
-<b>/bulkdelete</b> — delete many:
-Type account numbers: 1,2,3
-Or type a category name to delete all in it""",
-
-    "preview": """<b>📂 How to Preview</b>
-
-<b>/preview</b> — show accounts to buyer:
-1. Pick category
-2. Type how many
-3. Shows accounts with links
-4. Tap "Sell" to sell right away""",
-
-    "categories": """<b>📂 Categories</b>
-
-<b>/categories</b> — see all categories
-<b>/addcategory Food</b> — make new one
-<b>/deletecategory Food</b> — delete one""",
-
-    "sales": """<b>📈 Sales</b>
-
-<b>/sales</b> — see all sales
-Filter by: 🟡 Pending / ✅ Paid / 📋 All
-
-<b>/sale 123</b> — see one sale
-Can mark paid, cancel, or change status""",
-
-    "inventory": """<b>📦 Inventory</b>
-
-<b>/inventory</b> — see what you have:
-🟢 how many available
-🔴 how many sold
-🟡 how many waiting for money
-Per category and total""",
-
-    "buyers": """<b>👥 Buyers</b>
-
-<b>/buyers</b> — see all buyers
-<b>/buyer John</b> — see John's orders""",
-
-    "reports": """<b>📊 Money Reports</b>
-
-<b>/report</b> — pick time range:
-Today / This Week / This Month / All Time
-
-Shows: how much money, how many sales, who sold what""",
-
-    "sellers": """<b>👤 Team Members</b>
-
-<b>/addseller 123456 Alice</b> — add member
-<b>/removeseller 123456</b> — remove member
-<b>/listsellers</b> — see everyone""",
 
     "settings": """<b>⚙️ Settings</b>
 
