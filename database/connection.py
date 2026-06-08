@@ -106,6 +106,37 @@ def migrate(conn, current_version):
         conn.commit()
         logger.info("Migration to V3 complete.")
 
+    if current_version < 4:
+        logger.info("Migrating schema from V3 to V4...")
+        try:
+            conn.execute("ALTER TABLE sales RENAME TO sales_old")
+            conn.execute("""
+                CREATE TABLE sales (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    account_id INTEGER NOT NULL UNIQUE,
+                    seller_id INTEGER,
+                    buyer_name TEXT NOT NULL DEFAULT 'Unknown',
+                    price REAL NOT NULL DEFAULT 0,
+                    payment_status TEXT NOT NULL DEFAULT 'pending',
+                    tags TEXT,
+                    notes TEXT,
+                    sold_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+                    FOREIGN KEY (seller_id) REFERENCES sellers(id)
+                )
+            """)
+            conn.execute("""
+                INSERT INTO sales (id, account_id, seller_id, buyer_name, price, payment_status, tags, notes, sold_at)
+                SELECT id, account_id, seller_id, buyer_name, price, payment_status, tags, notes, sold_at
+                FROM sales_old
+            """)
+            conn.execute("DROP TABLE sales_old")
+        except sqlite3.OperationalError as e:
+            logger.warning("V4 migration partial: %s", e)
+        set_schema_version(conn, 4)
+        conn.commit()
+        logger.info("Migration to V4 complete.")
+
 
 def init_db():
     conn = connect()
@@ -149,6 +180,33 @@ def init_db():
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS ix_accounts_status
         ON accounts (status)
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sales (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_id INTEGER NOT NULL UNIQUE,
+            seller_id INTEGER,
+            buyer_name TEXT NOT NULL DEFAULT 'Unknown',
+            price REAL NOT NULL DEFAULT 0,
+            payment_status TEXT NOT NULL DEFAULT 'pending',
+            tags TEXT,
+            notes TEXT,
+            sold_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+            FOREIGN KEY (seller_id) REFERENCES sellers(id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sellers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            added_by INTEGER NOT NULL,
+            active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
     """)
 
     cursor.execute("""

@@ -280,7 +280,7 @@ def _fmt_sales_page(sales, page, total_pages):
         ps = sd.get("payment_status", "pending")
         ps_emoji = "✅" if ps == "paid" else "🟡" if ps == "pending" else "⚪"
         text += (
-            f"• #{sd.get('id', '')} | {esc(sd.get('buyer_name'))} | "
+            f"• <b>#{sd.get('id', '')}</b> | {esc(sd.get('buyer_name'))} | "
             f"₹{sd.get('price', 0):.0f} | {ps_emoji} {esc(ps)} | "
             f"{esc(sd.get('seller_name', '—'))}\n"
         )
@@ -364,7 +364,7 @@ def _editsale_summary(sales, invalid_ids=None, created_drafts=None):
         buyer = esc(s.get("buyer_name")) or "—"
         price = s.get("price", 0) or 0
         text += (
-            f"• #{s['id']} | {buyer} | "
+            f"• <b>#{s['id']}</b> | {buyer} | "
             f"₹{price:.0f} | {ps_emoji} {esc(ps)}\n"
         )
     if created_drafts:

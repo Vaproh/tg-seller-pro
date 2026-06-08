@@ -305,5 +305,7 @@ def create_draft_sale(account_id, seller_id):
         )
         conn.commit()
         return cursor.lastrowid
+    except sqlite3.IntegrityError:
+        return None
     finally:
         conn.close()
