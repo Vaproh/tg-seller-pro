@@ -46,6 +46,12 @@ def shutdown(signum, frame):
         logger.error("Error shutting down scheduler: %s", e)
 
 
+async def post_init(application):
+    from utils.scheduler import setup_scheduler
+    setup_scheduler(application)
+    logger.info("Scheduler started.")
+
+
 def main():
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
@@ -54,12 +60,14 @@ def main():
     init_db()
 
     logger.info("Building application...")
-    application = Application.builder().token(config.BOT_TOKEN).build()
+    application = (
+        Application.builder()
+        .token(config.BOT_TOKEN)
+        .post_init(post_init)
+        .build()
+    )
 
     register_handlers(application)
-
-    from utils.scheduler import setup_scheduler
-    setup_scheduler(application)
 
     logger.info("Starting bot...")
     application.run_polling(drop_pending_updates=True)
