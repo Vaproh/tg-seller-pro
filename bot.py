@@ -65,8 +65,12 @@ LOG_DIR = ROOT_DIR / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 log_file = LOG_DIR / f"{BOT_NAME.lower().replace(' ', '_')}.log"
-log_formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
-file_handler = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8")
+log_formatter = logging.Formatter(
+    "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+)
+file_handler = RotatingFileHandler(
+    log_file, maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8"
+)
 file_handler.setFormatter(log_formatter)
 file_handler.setLevel(logging.INFO)
 console_handler = logging.StreamHandler()
@@ -130,7 +134,10 @@ def allowed_guard(update: Update) -> bool:
 
 def category_keyboard(prefix: str) -> InlineKeyboardMarkup:
     rows = list_categories()
-    buttons = [[InlineKeyboardButton(row["name"], callback_data=f"{prefix}:{row['id']}")] for row in rows]
+    buttons = [
+        [InlineKeyboardButton(row["name"], callback_data=f"{prefix}:{row['id']}")]
+        for row in rows
+    ]
     return InlineKeyboardMarkup(buttons)
 
 
@@ -156,8 +163,12 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(buttons)
 
 
-def fmt_account_block(index: int, username: str, password: str, category: str | None = None) -> str:
-    category_line = f"\n│ <b>Category:</b> <code>{esc(category)}</code>" if category else ""
+def fmt_account_block(
+    index: int, username: str, password: str, category: str | None = None
+) -> str:
+    category_line = (
+        f"\n│ <b>Category:</b> <code>{esc(category)}</code>" if category else ""
+    )
     return (
         f"╭─ <b>Account {index}</b> ─────────────────\n"
         f"│ <b>Username:</b> <code>{esc(username)}</code>\n"
@@ -198,18 +209,24 @@ def build_pending_page(page: int) -> tuple[str, InlineKeyboardMarkup]:
             f"│ <b>Status:</b> <code>pending</code>\n"
             "╰──────────────────────────"
         )
-        keyboard.append([
-            InlineKeyboardButton(
-                "✅ Mark used",
-                callback_data=f"itemused:{row['item_id']}:{page}",
-            )
-        ])
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    "✅ Mark used",
+                    callback_data=f"itemused:{row['item_id']}:{page}",
+                )
+            ]
+        )
 
     nav_buttons = []
     if page > 0:
-        nav_buttons.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"pending:page:{page - 1}"))
+        nav_buttons.append(
+            InlineKeyboardButton("⬅️ Previous", callback_data=f"pending:page:{page - 1}")
+        )
     if offset + len(rows) < total:
-        nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"pending:page:{page + 1}"))
+        nav_buttons.append(
+            InlineKeyboardButton("Next ➡️", callback_data=f"pending:page:{page + 1}")
+        )
     if nav_buttons:
         keyboard.append(nav_buttons)
 
@@ -244,36 +261,50 @@ def build_accounts_page(page: int) -> tuple[str, InlineKeyboardMarkup]:
             "╰──────────────────────────"
         )
         action_label = "♻️ Mark unused" if row["used"] else "🚫 Mark used"
-        keyboard.append([
-            InlineKeyboardButton(
-                action_label,
-                callback_data=f"accounttoggle:{row['id']}:{page}",
-            )
-        ])
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    action_label,
+                    callback_data=f"accounttoggle:{row['id']}:{page}",
+                )
+            ]
+        )
 
     nav_buttons = []
     if page > 0:
-        nav_buttons.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"accountpage:{page - 1}"))
+        nav_buttons.append(
+            InlineKeyboardButton("⬅️ Previous", callback_data=f"accountpage:{page - 1}")
+        )
     if offset + len(rows) < total:
-        nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"accountpage:{page + 1}"))
+        nav_buttons.append(
+            InlineKeyboardButton("Next ➡️", callback_data=f"accountpage:{page + 1}")
+        )
     if nav_buttons:
         keyboard.append(nav_buttons)
 
     return "\n\n".join(text), InlineKeyboardMarkup(keyboard)
 
 
-def build_list_page(page: int, filter_mode: str = "all", category_id: int = 0) -> tuple[str, InlineKeyboardMarkup]:
+def build_list_page(
+    page: int, filter_mode: str = "all", category_id: int = 0
+) -> tuple[str, InlineKeyboardMarkup]:
     filter_label = {
         "all": "All",
         "unused": "Unused",
         "used": "Used",
     }.get(filter_mode, "All")
     used_filter = None if filter_mode == "all" else filter_mode == "used"
-    category_name = "All categories" if category_id == 0 else get_category_name(category_id) or "Unknown"
+    category_name = (
+        "All categories"
+        if category_id == 0
+        else get_category_name(category_id) or "Unknown"
+    )
 
     total = count_accounts(used_filter, category_id if category_id > 0 else None)
     offset = page * LIST_PAGE_SIZE
-    rows = list_accounts(LIST_PAGE_SIZE, offset, used_filter, category_id if category_id > 0 else None)
+    rows = list_accounts(
+        LIST_PAGE_SIZE, offset, used_filter, category_id if category_id > 0 else None
+    )
 
     if not rows:
         return (
@@ -286,15 +317,25 @@ def build_list_page(page: int, filter_mode: str = "all", category_id: int = 0) -
     ]
     keyboard = [
         [
-            InlineKeyboardButton("📌 All", callback_data=f"listpage:0:all:{category_id}"),
-            InlineKeyboardButton("🟢 Unused", callback_data=f"listpage:0:unused:{category_id}"),
-            InlineKeyboardButton("🔴 Used", callback_data=f"listpage:0:used:{category_id}"),
+            InlineKeyboardButton(
+                "📌 All", callback_data=f"listpage:0:all:{category_id}"
+            ),
+            InlineKeyboardButton(
+                "🟢 Unused", callback_data=f"listpage:0:unused:{category_id}"
+            ),
+            InlineKeyboardButton(
+                "🔴 Used", callback_data=f"listpage:0:used:{category_id}"
+            ),
         ]
     ]
 
     categories = list_categories()
     category_buttons: list[list[InlineKeyboardButton]] = [
-        [InlineKeyboardButton("📂 All categories", callback_data=f"listpage:0:{filter_mode}:0")]
+        [
+            InlineKeyboardButton(
+                "📂 All categories", callback_data=f"listpage:0:{filter_mode}:0"
+            )
+        ]
     ]
     for index in range(0, len(categories), 2):
         row = []
@@ -315,18 +356,28 @@ def build_list_page(page: int, filter_mode: str = "all", category_id: int = 0) -
             "<b>User:</b> <code>{username}</code>  |  "
             "<b>Category:</b> <code>{category}</code>  |  "
             "<b>Status:</b> <code>{status}</code>".format(
-                id=row['id'],
-                username=esc(row['username']),
-                category=esc(row['category']),
+                id=row["id"],
+                username=esc(row["username"]),
+                category=esc(row["category"]),
                 status=status,
             )
         )
 
     nav_buttons = []
     if page > 0:
-        nav_buttons.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"listpage:{page - 1}:{filter_mode}:{category_id}"))
+        nav_buttons.append(
+            InlineKeyboardButton(
+                "⬅️ Previous",
+                callback_data=f"listpage:{page - 1}:{filter_mode}:{category_id}",
+            )
+        )
     if offset + len(rows) < total:
-        nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"listpage:{page + 1}:{filter_mode}:{category_id}"))
+        nav_buttons.append(
+            InlineKeyboardButton(
+                "Next ➡️",
+                callback_data=f"listpage:{page + 1}:{filter_mode}:{category_id}",
+            )
+        )
     if nav_buttons:
         keyboard.append(nav_buttons)
 
@@ -429,13 +480,18 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = context.args[0]
     password = " ".join(context.args[1:])
 
-    pending_adds[update.effective_user.id] = {"username": username, "password": password}
+    pending_adds[update.effective_user.id] = {
+        "username": username,
+        "password": password,
+    }
     await update.effective_message.reply_text(
         "<b>📁 Select a category</b>\n<em>Choose where to save this account</em>",
         reply_markup=category_keyboard("addcat"),
         parse_mode=ParseMode.HTML,
     )
-    logger.info("User %s started add flow for username=%s", update.effective_user.id, username)
+    logger.info(
+        "User %s started add flow for username=%s", update.effective_user.id, username
+    )
 
 
 async def bulkadd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -496,14 +552,16 @@ async def getid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Do not mark as used on retrieval; user marks as used manually when account is sold/given
 
     await update.effective_message.reply_text(
-        "\n".join([
-            "<b>📌 Account details</b>",
-            f"• <b>ID:</b> <code>{account_id}</code>",
-            f"• <b>Username:</b> <code>{esc(account['username'])}</code>",
-            f"• <b>Password:</b> <tg-spoiler>{esc(account['password'])}</tg-spoiler>",
-            f"• <b>Category:</b> <code>{esc(account['category'])}</code>",
-            f"• <b>Status:</b> <code>{'already used' if was_used else 'unused'}</code>",
-        ]),
+        "\n".join(
+            [
+                "<b>📌 Account details</b>",
+                f"• <b>ID:</b> <code>{account_id}</code>",
+                f"• <b>Username:</b> <code>{esc(account['username'])}</code>",
+                f"• <b>Password:</b> <tg-spoiler>{esc(account['password'])}</tg-spoiler>",
+                f"• <b>Category:</b> <code>{esc(account['category'])}</code>",
+                f"• <b>Status:</b> <code>{'already used' if was_used else 'unused'}</code>",
+            ]
+        ),
         parse_mode=ParseMode.HTML,
     )
     logger.info(
@@ -563,12 +621,16 @@ async def deletecategory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.effective_message.reply_text(
         f"<b>⚠️ Delete category</b> <code>{esc(name)}</code>?\n"
         "All accounts in this category will be moved to uncategorized.",
-        reply_markup=InlineKeyboardMarkup([
+        reply_markup=InlineKeyboardMarkup(
             [
-                InlineKeyboardButton("✅ Confirm", callback_data=f"delcatconfirm:{esc(name)}"),
-                InlineKeyboardButton("❌ Cancel", callback_data="delcatcancel:0"),
+                [
+                    InlineKeyboardButton(
+                        "✅ Confirm", callback_data=f"delcatconfirm:{esc(name)}"
+                    ),
+                    InlineKeyboardButton("❌ Cancel", callback_data="delcatcancel:0"),
+                ]
             ]
-        ]),
+        ),
         parse_mode=ParseMode.HTML,
     )
 
@@ -579,13 +641,19 @@ async def categories(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     rows = list_categories()
     if not rows:
-        await update.effective_message.reply_text("<b>📭 No categories found</b>", parse_mode=ParseMode.HTML)
+        await update.effective_message.reply_text(
+            "<b>📭 No categories found</b>", parse_mode=ParseMode.HTML
+        )
         return
 
     lines = ["<b>📂 Categories</b>"]
     for row in rows:
-        lines.append(f"• <code>{esc(row['name'])}</code>  <i>({row['account_count']})</i>")
-    await update.effective_message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
+        lines.append(
+            f"• <code>{esc(row['name'])}</code>  <i>({row['account_count']})</i>"
+        )
+    await update.effective_message.reply_text(
+        "\n".join(lines), parse_mode=ParseMode.HTML
+    )
 
 
 async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -601,23 +669,37 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pending_search[update.effective_user.id] = {"stage": "type", "filters": {}}
     await update.effective_message.reply_text(
         "<b>🔎 Search accounts</b>\nChoose search type:",
-        reply_markup=InlineKeyboardMarkup([
+        reply_markup=InlineKeyboardMarkup(
             [
-                InlineKeyboardButton("📝 Search term", callback_data="search:type:term"),
-                InlineKeyboardButton("👤 Search username", callback_data="search:type:username"),
-            ],
-            [
-                InlineKeyboardButton("🔑 Search password", callback_data="search:type:password"),
-                InlineKeyboardButton("🆔 Search by ID", callback_data="search:type:id"),
-            ],
-            [
-                InlineKeyboardButton("📂 Filter by category", callback_data="search:type:category"),
-            ],
-            [
-                InlineKeyboardButton("🔴 Used", callback_data="search:type:used"),
-                InlineKeyboardButton("🟢 Unused", callback_data="search:type:unused"),
-            ],
-        ]),
+                [
+                    InlineKeyboardButton(
+                        "📝 Search term", callback_data="search:type:term"
+                    ),
+                    InlineKeyboardButton(
+                        "👤 Search username", callback_data="search:type:username"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        "🔑 Search password", callback_data="search:type:password"
+                    ),
+                    InlineKeyboardButton(
+                        "🆔 Search by ID", callback_data="search:type:id"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        "📂 Filter by category", callback_data="search:type:category"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton("🔴 Used", callback_data="search:type:used"),
+                    InlineKeyboardButton(
+                        "🟢 Unused", callback_data="search:type:unused"
+                    ),
+                ],
+            ]
+        ),
         parse_mode=ParseMode.HTML,
     )
 
@@ -670,9 +752,15 @@ async def perform_search(update: Update, raw: str) -> None:
                 account = None
             if used is not None and bool(account["used"] if account else False) != used:
                 account = None
-            if username_term and username_term.lower() not in account["username"].lower():
+            if (
+                username_term
+                and username_term.lower() not in account["username"].lower()
+            ):
                 account = None
-            if password_term and password_term.lower() not in account["password"].lower():
+            if (
+                password_term
+                and password_term.lower() not in account["password"].lower()
+            ):
                 account = None
         if account:
             results = [account]
@@ -732,7 +820,9 @@ async def perform_search(update: Update, raw: str) -> None:
     if count > 25:
         parts.append(f"<b>⚠️ Showing first 25 of {count} results</b>")
 
-    await update.effective_message.reply_text("\n\n".join(parts), parse_mode=ParseMode.HTML)
+    await update.effective_message.reply_text(
+        "\n\n".join(parts), parse_mode=ParseMode.HTML
+    )
 
 
 async def delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -749,7 +839,9 @@ async def delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         account_id = int(context.args[0])
     except ValueError:
-        await update.effective_message.reply_text("<b>❗ Account ID must be a number</b>", parse_mode=ParseMode.HTML)
+        await update.effective_message.reply_text(
+            "<b>❗ Account ID must be a number</b>", parse_mode=ParseMode.HTML
+        )
         return
 
     if not get_account_by_id(account_id):
@@ -761,14 +853,17 @@ async def delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     pending_delete_confirm[update.effective_user.id] = account_id
     await update.effective_message.reply_text(
-        f"<b>⚠️ Delete account #{account_id}?</b>\n"
-        "This action cannot be undone.",
-        reply_markup=InlineKeyboardMarkup([
+        f"<b>⚠️ Delete account #{account_id}?</b>\nThis action cannot be undone.",
+        reply_markup=InlineKeyboardMarkup(
             [
-                InlineKeyboardButton("✅ Confirm delete", callback_data=f"delconfirm:{account_id}"),
-                InlineKeyboardButton("❌ Cancel", callback_data="delcancel:0"),
+                [
+                    InlineKeyboardButton(
+                        "✅ Confirm delete", callback_data=f"delconfirm:{account_id}"
+                    ),
+                    InlineKeyboardButton("❌ Cancel", callback_data="delcancel:0"),
+                ]
             ]
-        ]),
+        ),
         parse_mode=ParseMode.HTML,
     )
 
@@ -779,7 +874,9 @@ async def logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     rows = list_recent_sessions(10)
     if not rows:
-        await update.effective_message.reply_text("<b>📭 No retrieval sessions yet</b>", parse_mode=ParseMode.HTML)
+        await update.effective_message.reply_text(
+            "<b>📭 No retrieval sessions yet</b>", parse_mode=ParseMode.HTML
+        )
         return
 
     text = ["<b>Recent retrieval sessions</b>"]
@@ -794,7 +891,13 @@ async def logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"│ <b>Created:</b> <code>{esc(row['created_at'])}</code>\n"
             "╰──────────────────────────"
         )
-        keyboard.append([InlineKeyboardButton(f"Session {row['id']}", callback_data=f"sess:{row['id']}")])
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    f"Session {row['id']}", callback_data=f"sess:{row['id']}"
+                )
+            ]
+        )
 
     await update.effective_message.reply_text(
         "\n\n".join(text),
@@ -833,7 +936,9 @@ async def delsession(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     ok = delete_session(session_id)
     if ok:
-        logger.info("Deleted session %s by user %s", session_id, update.effective_user.id)
+        logger.info(
+            "Deleted session %s by user %s", session_id, update.effective_user.id
+        )
         await update.effective_message.reply_text(
             f"<b>🗑️ Session deleted</b> <code>{session_id}</code>",
             parse_mode=ParseMode.HTML,
@@ -891,12 +996,16 @@ async def bulkdelete(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_message.reply_text(
             "<b>⚠️ Confirm bulk deletion</b>\n"
             "This will remove all matching accounts permanently.",
-            reply_markup=InlineKeyboardMarkup([
+            reply_markup=InlineKeyboardMarkup(
                 [
-                    InlineKeyboardButton("✅ Confirm delete", callback_data="bulkconfirm:1"),
-                    InlineKeyboardButton("❌ Cancel", callback_data="bulkcancel:0"),
+                    [
+                        InlineKeyboardButton(
+                            "✅ Confirm delete", callback_data="bulkconfirm:1"
+                        ),
+                        InlineKeyboardButton("❌ Cancel", callback_data="bulkcancel:0"),
+                    ]
                 ]
-            ]),
+            ),
             parse_mode=ParseMode.HTML,
         )
         return
@@ -929,11 +1038,13 @@ async def extractcsv(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def _bulk_delete_from_input(update: Update, raw: str) -> None:
     text = raw.strip()
     if not text:
-        await update.effective_message.reply_text("<b>❗ Nothing to delete</b>", parse_mode=ParseMode.HTML)
+        await update.effective_message.reply_text(
+            "<b>❗ Nothing to delete</b>", parse_mode=ParseMode.HTML
+        )
         return
 
     ids = []
-    for token in text.replace(',', ' ').split():
+    for token in text.replace(",", " ").split():
         try:
             ids.append(int(token))
         except ValueError:
@@ -945,7 +1056,12 @@ async def _bulk_delete_from_input(update: Update, raw: str) -> None:
             f"<b>🗑️ Deleted {deleted} account(s)</b>",
             parse_mode=ParseMode.HTML,
         )
-        logger.info("Bulk deleted accounts by user %s: ids=%s deleted=%s", update.effective_user.id, ids, deleted)
+        logger.info(
+            "Bulk deleted accounts by user %s: ids=%s deleted=%s",
+            update.effective_user.id,
+            ids,
+            deleted,
+        )
         return
 
     category_name = normalize_name(text)
@@ -962,7 +1078,12 @@ async def _bulk_delete_from_input(update: Update, raw: str) -> None:
         f"<b>🗑️ Deleted {deleted} account(s)</b> from <code>{esc(category_name)}</code>",
         parse_mode=ParseMode.HTML,
     )
-    logger.info("Bulk deleted accounts by user %s: category=%s deleted=%s", update.effective_user.id, category_name, deleted)
+    logger.info(
+        "Bulk deleted accounts by user %s: category=%s deleted=%s",
+        update.effective_user.id,
+        category_name,
+        deleted,
+    )
 
 
 async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -983,8 +1104,12 @@ async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         file = await document.get_file()
         raw = await file.download_as_bytearray()
     except Exception as exc:
-        logger.warning("CSV upload failed for user %s: %s", update.effective_user.id, exc)
-        await update.effective_message.reply_text("<b>❌ Could not read the uploaded CSV</b>", parse_mode=ParseMode.HTML)
+        logger.warning(
+            "CSV upload failed for user %s: %s", update.effective_user.id, exc
+        )
+        await update.effective_message.reply_text(
+            "<b>❌ Could not read the uploaded CSV</b>", parse_mode=ParseMode.HTML
+        )
         return
 
     try:
@@ -1002,8 +1127,17 @@ async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_header = None
         password_header = None
         for header in reader.fieldnames:
-            norm = (header or "").lower().replace(" ", "").replace("_", "").replace("-", "")
-            if user_header is None and any(token in norm for token in ("userid", "user", "email", "username", "account")):
+            norm = (
+                (header or "")
+                .lower()
+                .replace(" ", "")
+                .replace("_", "")
+                .replace("-", "")
+            )
+            if user_header is None and any(
+                token in norm
+                for token in ("userid", "user", "email", "username", "account")
+            ):
                 user_header = header
             if password_header is None and "password" in norm:
                 password_header = header
@@ -1035,23 +1169,26 @@ async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "<b>📄 CSV detected</b>\n"
                 f"• <b>Detected user/email column:</b> <code>{esc(user_header)}</code>\n"
                 f"• <b>Detected password column:</b> <code>{esc(password_header)}</code>\n\n"
-                "Sample rows (first 3):\n"
-                + "\n".join(preview)
+                "Sample rows (first 3):\n" + "\n".join(preview)
             ),
-            reply_markup=InlineKeyboardMarkup([
+            reply_markup=InlineKeyboardMarkup(
                 [
-                    InlineKeyboardButton(
-                        "✅ Confirm import",
-                        callback_data=f"csvconfirm:{quote(user_header)}:{quote(password_header)}",
-                    ),
-                    InlineKeyboardButton("❌ Cancel", callback_data="csvcancel:0"),
+                    [
+                        InlineKeyboardButton(
+                            "✅ Confirm import",
+                            callback_data=f"csvconfirm:{quote(user_header)}:{quote(password_header)}",
+                        ),
+                        InlineKeyboardButton("❌ Cancel", callback_data="csvcancel:0"),
+                    ]
                 ]
-            ]),
+            ),
             parse_mode=ParseMode.HTML,
         )
         return
     except Exception as exc:
-        logger.warning("CSV extraction failed for user %s: %s", update.effective_user.id, exc)
+        logger.warning(
+            "CSV extraction failed for user %s: %s", update.effective_user.id, exc
+        )
         await update.effective_message.reply_text(
             "<b>❌ Could not extract the columns</b>\nMake sure the CSV has a User/Email column and a Password column.",
             parse_mode=ParseMode.HTML,
@@ -1075,8 +1212,12 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "<b>📂 By category</b>",
     ]
     for row in data["categories"]:
-        lines.append(f"• <code>{esc(row['name'])}</code>  <i>({row['account_count']})</i>")
-    await update.effective_message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
+        lines.append(
+            f"• <code>{esc(row['name'])}</code>  <i>({row['account_count']})</i>"
+        )
+    await update.effective_message.reply_text(
+        "\n".join(lines), parse_mode=ParseMode.HTML
+    )
 
 
 async def export(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1085,7 +1226,9 @@ async def export(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     content = export_accounts_csv()
     if not content or len(content) <= 1:
-        await update.effective_message.reply_text("<b>📭 No accounts to export</b>", parse_mode=ParseMode.HTML)
+        await update.effective_message.reply_text(
+            "<b>📭 No accounts to export</b>", parse_mode=ParseMode.HTML
+        )
         return
 
     from telegram import InputFile
@@ -1168,7 +1311,9 @@ async def handle_category_callback(update: Update, context: ContextTypes.DEFAULT
             await query.edit_message_text("⏳ Session expired.")
             return
 
-        ok, message, account_id = add_account(data["username"], data["password"], category_id)
+        ok, message, account_id = add_account(
+            data["username"], data["password"], category_id
+        )
         if ok:
             logger.info(
                 "Added account id=%s username=%s category=%s by user %s",
@@ -1191,7 +1336,11 @@ async def handle_category_callback(update: Update, context: ContextTypes.DEFAULT
         return
 
     if prefix == "bulkcat":
-        pending_bulk[user_id] = {"category_id": category_id, "category_name": category_name, "stage": "lines"}
+        pending_bulk[user_id] = {
+            "category_id": category_id,
+            "category_name": category_name,
+            "stage": "lines",
+        }
         await query.edit_message_text(
             f"<b>📥 Bulk import category selected</b>\n"
             f"• <b>Category:</b> <code>{esc(category_name)}</code>\n\n"
@@ -1204,7 +1353,11 @@ async def handle_category_callback(update: Update, context: ContextTypes.DEFAULT
         return
 
     if prefix == "getcat":
-        pending_gets[user_id] = {"category_id": category_id, "category_name": category_name, "stage": "count"}
+        pending_gets[user_id] = {
+            "category_id": category_id,
+            "category_name": category_name,
+            "stage": "count",
+        }
         await query.edit_message_text(
             f"<b>📁 Category selected</b>\n"
             f"• <b>Category:</b> <code>{esc(category_name)}</code>\n\n"
@@ -1214,7 +1367,10 @@ async def handle_category_callback(update: Update, context: ContextTypes.DEFAULT
         return
 
     if prefix == "csvcat":
-        pending_csv_extract[user_id] = {"category_id": category_id, "category_name": category_name}
+        pending_csv_extract[user_id] = {
+            "category_id": category_id,
+            "category_name": category_name,
+        }
         await query.edit_message_text(
             f"<b>📄 CSV extraction ready</b>\n"
             f"• <b>Target category:</b> <code>{esc(category_name)}</code>\n\n"
@@ -1268,24 +1424,31 @@ async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "menu:add":
         await query.edit_message_text(
             "<b>➕ Choose how to add an account</b>\n",
-            reply_markup=InlineKeyboardMarkup([
+            reply_markup=InlineKeyboardMarkup(
                 [
-                    InlineKeyboardButton("🧾 One account", callback_data="menu:add:single"),
-                    InlineKeyboardButton("📥 Bulk import", callback_data="menu:add:bulk"),
-                ],
-                [
-                    InlineKeyboardButton("📄 Extract from CSV", callback_data="menu:add:csv"),
-                ],
-                [InlineKeyboardButton("⬅ Back", callback_data="menu:back")],
-            ]),
+                    [
+                        InlineKeyboardButton(
+                            "🧾 One account", callback_data="menu:add:single"
+                        ),
+                        InlineKeyboardButton(
+                            "📥 Bulk import", callback_data="menu:add:bulk"
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "📄 Extract from CSV", callback_data="menu:add:csv"
+                        ),
+                    ],
+                    [InlineKeyboardButton("⬅ Back", callback_data="menu:back")],
+                ]
+            ),
             parse_mode=ParseMode.HTML,
         )
         return
 
     if data == "menu:add:single":
         await query.edit_message_text(
-            "<b>➕ Add one account</b>\n"
-            "Send: <code>/add username password</code>",
+            "<b>➕ Add one account</b>\nSend: <code>/add username password</code>",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -1376,7 +1539,9 @@ async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "<b>📂 By category</b>",
         ]
         for row in data_stats["categories"]:
-            lines.append(f"• <code>{esc(row['name'])}</code>  <i>({row['account_count']})</i>")
+            lines.append(
+                f"• <code>{esc(row['name'])}</code>  <i>({row['account_count']})</i>"
+            )
         await query.edit_message_text("\n".join(lines), parse_mode=ParseMode.HTML)
         return
 
@@ -1446,15 +1611,31 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
         ]
         keyboard = []
         for row in items:
-            parts.append(fmt_account_block(row["position"], row["username"], row["password"], row["category"]))
-            keyboard.append([
-                InlineKeyboardButton(f"✅ Mark used", callback_data=f"itemused:{row['item_id']}:0:{session_id}"),
-                InlineKeyboardButton(f"♻️ Mark unused", callback_data=f"itemunused:{row['item_id']}:0:{session_id}"),
-])
+            parts.append(
+                fmt_account_block(
+                    row["position"], row["username"], row["password"], row["category"]
+                )
+            )
+            keyboard.append(
+                [
+                    InlineKeyboardButton(
+                        f"✅ Mark used",
+                        callback_data=f"itemused:{row['item_id']}:0:{session_id}",
+                    ),
+                    InlineKeyboardButton(
+                        f"♻️ Mark unused",
+                        callback_data=f"itemunused:{row['item_id']}:0:{session_id}",
+                    ),
+                ]
+            )
 
-        keyboard.append([
-            InlineKeyboardButton("🗑️ Delete session", callback_data=f"delsessconfirm:{session_id}"),
-        ])
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    "🗑️ Delete session", callback_data=f"delsessconfirm:{session_id}"
+                ),
+            ]
+        )
 
         await query.edit_message_text(
             "\n\n".join(parts),
@@ -1551,7 +1732,9 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
             return
 
         text, reply_markup = build_pending_page(page)
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        await query.edit_message_text(
+            text, reply_markup=reply_markup, parse_mode=ParseMode.HTML
+        )
         return
 
     if query.data.startswith("itemused:") or query.data.startswith("itemunused:"):
@@ -1585,7 +1768,9 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
             session = get_session(session_id)
             items = get_session_items(session_id)
             if not session or not items:
-                await query.edit_message_text("<b>⚠️ Session items updated.</b>", parse_mode=ParseMode.HTML)
+                await query.edit_message_text(
+                    "<b>⚠️ Session items updated.</b>", parse_mode=ParseMode.HTML
+                )
                 return
 
             parts = [
@@ -1598,11 +1783,26 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
             ]
             keyboard = []
             for row in items:
-                parts.append(fmt_account_block(row["position"], row["username"], row["password"], row["category"]))
-                keyboard.append([
-                    InlineKeyboardButton(f"✅ Mark used", callback_data=f"itemused:{row['item_id']}:0:{session_id}"),
-                    InlineKeyboardButton(f"♻️ Mark unused", callback_data=f"itemunused:{row['item_id']}:0:{session_id}"),
-                ])
+                parts.append(
+                    fmt_account_block(
+                        row["position"],
+                        row["username"],
+                        row["password"],
+                        row["category"],
+                    )
+                )
+                keyboard.append(
+                    [
+                        InlineKeyboardButton(
+                            f"✅ Mark used",
+                            callback_data=f"itemused:{row['item_id']}:0:{session_id}",
+                        ),
+                        InlineKeyboardButton(
+                            f"♻️ Mark unused",
+                            callback_data=f"itemunused:{row['item_id']}:0:{session_id}",
+                        ),
+                    ]
+                )
 
             await query.edit_message_text(
                 "\n\n".join(parts),
@@ -1612,7 +1812,9 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
             return
 
         text, reply_markup = build_pending_page(page)
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        await query.edit_message_text(
+            text, reply_markup=reply_markup, parse_mode=ParseMode.HTML
+        )
         return
 
     if query.data.startswith("accountpage:"):
@@ -1628,7 +1830,9 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
             return
 
         text, reply_markup = build_accounts_page(page)
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        await query.edit_message_text(
+            text, reply_markup=reply_markup, parse_mode=ParseMode.HTML
+        )
         return
 
     if query.data.startswith("delconfirm:"):
@@ -1641,14 +1845,22 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
         ok = delete_account(account_id)
         pending_delete_confirm.pop(query.from_user.id, None)
         if ok:
-            await query.edit_message_text(f"<b>🗑️ Deleted account</b> <code>{account_id}</code>", parse_mode=ParseMode.HTML)
+            await query.edit_message_text(
+                f"<b>🗑️ Deleted account</b> <code>{account_id}</code>",
+                parse_mode=ParseMode.HTML,
+            )
         else:
-            await query.edit_message_text(f"<b>❌ Could not delete account</b> <code>{account_id}</code>", parse_mode=ParseMode.HTML)
+            await query.edit_message_text(
+                f"<b>❌ Could not delete account</b> <code>{account_id}</code>",
+                parse_mode=ParseMode.HTML,
+            )
         return
 
     if query.data.startswith("delcancel:"):
         pending_delete_confirm.pop(query.from_user.id, None)
-        await query.edit_message_text("<b>❌ Deletion cancelled</b>", parse_mode=ParseMode.HTML)
+        await query.edit_message_text(
+            "<b>❌ Deletion cancelled</b>", parse_mode=ParseMode.HTML
+        )
         return
 
     if query.data.startswith("delcatconfirm:"):
@@ -1662,12 +1874,17 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
                 parse_mode=ParseMode.HTML,
             )
         else:
-            await query.edit_message_text(f"<b>❌ Could not delete category</b>\n<code>{esc(message)}</code>", parse_mode=ParseMode.HTML)
+            await query.edit_message_text(
+                f"<b>❌ Could not delete category</b>\n<code>{esc(message)}</code>",
+                parse_mode=ParseMode.HTML,
+            )
         return
 
     if query.data.startswith("delcatcancel:"):
         pending_delete_category_confirm.pop(query.from_user.id, None)
-        await query.edit_message_text("<b>❌ Category deletion cancelled</b>", parse_mode=ParseMode.HTML)
+        await query.edit_message_text(
+            "<b>❌ Category deletion cancelled</b>", parse_mode=ParseMode.HTML
+        )
         return
 
     if query.data.startswith("delsessconfirm:"):
@@ -1680,23 +1897,35 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
         ok = delete_session(session_id)
         if ok:
             logger.info("Deleted session %s by user %s", session_id, query.from_user.id)
-            await query.edit_message_text(f"<b>🗑️ Session deleted</b> <code>{session_id}</code>", parse_mode=ParseMode.HTML)
+            await query.edit_message_text(
+                f"<b>🗑️ Session deleted</b> <code>{session_id}</code>",
+                parse_mode=ParseMode.HTML,
+            )
         else:
-            await query.edit_message_text(f"<b>❌ Could not delete session</b> <code>{session_id}</code>", parse_mode=ParseMode.HTML)
+            await query.edit_message_text(
+                f"<b>❌ Could not delete session</b> <code>{session_id}</code>",
+                parse_mode=ParseMode.HTML,
+            )
         return
 
     if query.data.startswith("bulkconfirm:"):
         raw = pending_bulk_delete_confirm.pop(query.from_user.id, None)
         if not raw:
-            await query.edit_message_text("<b>⏳ Confirmation expired</b>", parse_mode=ParseMode.HTML)
+            await query.edit_message_text(
+                "<b>⏳ Confirmation expired</b>", parse_mode=ParseMode.HTML
+            )
             return
-        await query.edit_message_text("<b>🗑️ Deleting matching accounts…</b>", parse_mode=ParseMode.HTML)
+        await query.edit_message_text(
+            "<b>🗑️ Deleting matching accounts…</b>", parse_mode=ParseMode.HTML
+        )
         await _bulk_delete_from_input(update, raw)
         return
 
     if query.data.startswith("bulkcancel:"):
         pending_bulk_delete_confirm.pop(query.from_user.id, None)
-        await query.edit_message_text("<b>❌ Bulk deletion cancelled</b>", parse_mode=ParseMode.HTML)
+        await query.edit_message_text(
+            "<b>❌ Bulk deletion cancelled</b>", parse_mode=ParseMode.HTML
+        )
         return
 
     if query.data.startswith("listpage:"):
@@ -1720,21 +1949,27 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
             filter_mode = "all"
 
         text, reply_markup = build_list_page(page, filter_mode, category_id)
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        await query.edit_message_text(
+            text, reply_markup=reply_markup, parse_mode=ParseMode.HTML
+        )
         return
 
     if query.data.startswith("csvconfirm:"):
         user_id = query.from_user.id
         data = pending_csv_extract.pop(user_id, None)
         if not data:
-            await query.edit_message_text("<b>⏳ Confirmation expired</b>", parse_mode=ParseMode.HTML)
+            await query.edit_message_text(
+                "<b>⏳ Confirmation expired</b>", parse_mode=ParseMode.HTML
+            )
             return
 
         # perform the import using stored raw_text and detected headers
         raw = data.get("raw_text", "")
         user_header = data.get("detected_user_header")
         password_header = data.get("detected_password_header")
-        category_id = data.get("category_id") or get_category_id_by_name("uncategorized")
+        category_id = data.get("category_id") or get_category_id_by_name(
+            "uncategorized"
+        )
         reader = csv.DictReader(io.StringIO(raw))
         extracted_rows = []
         out = io.StringIO(newline="")
@@ -1766,12 +2001,19 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
             ),
             parse_mode=ParseMode.HTML,
         )
-        logger.info("CSV extracted for user %s: added=%s skipped=%s", user_id, summary['added'], summary['skipped'])
+        logger.info(
+            "CSV extracted for user %s: added=%s skipped=%s",
+            user_id,
+            summary["added"],
+            summary["skipped"],
+        )
         return
 
     if query.data.startswith("csvcancel:"):
         pending_csv_extract.pop(query.from_user.id, None)
-        await query.edit_message_text("<b>❌ CSV import cancelled</b>", parse_mode=ParseMode.HTML)
+        await query.edit_message_text(
+            "<b>❌ CSV import cancelled</b>", parse_mode=ParseMode.HTML
+        )
         return
 
     if query.data.startswith("accounttoggle:"):
@@ -1806,7 +2048,9 @@ async def handle_session_callback(update: Update, context: ContextTypes.DEFAULT_
         )
 
         text, reply_markup = build_accounts_page(page)
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        await query.edit_message_text(
+            text, reply_markup=reply_markup, parse_mode=ParseMode.HTML
+        )
         return
 
 
@@ -1823,7 +2067,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if user_id in pending_bulk:
-        data = pending_bulk.pop(user_id)
+        data = pending_bulk[user_id]
+        if data.get("stage") != "lines":
+            return
+        pending_bulk.pop(user_id)
         items, errors = parse_bulk_lines(text)
         summary = add_accounts_bulk(items, data["category_id"])
 
@@ -1850,7 +2097,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             len(errors),
         )
 
-        await update.effective_message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
+        await update.effective_message.reply_text(
+            "\n".join(lines), parse_mode=ParseMode.HTML
+        )
         return
 
     if user_id in pending_search:
@@ -1870,14 +2119,25 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if text.strip().lower() == "all":
                 await perform_search(update, "used" if used_filter else "unused")
             else:
-                await perform_search(update, f"{text.strip()} {'used' if used_filter else 'unused'}")
+                await perform_search(
+                    update, f"{text.strip()} {'used' if used_filter else 'unused'}"
+                )
+        elif used_filter is not None:
+            status_word = "used" if used_filter else "unused"
+            if text.strip().lower() == "all":
+                await perform_search(update, status_word)
+            else:
+                await perform_search(update, f"{text.strip()} {status_word}")
         else:
             # term search or default
             await perform_search(update, text.strip())
         return
 
     if user_id in pending_gets:
-        data = pending_gets.pop(user_id)
+        data = pending_gets[user_id]
+        if data.get("stage") != "count":
+            return
+        pending_gets.pop(user_id)
         try:
             amount = int(text.strip())
             if amount <= 0:
@@ -1914,17 +2174,24 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
 
         if not available_rows:
-            heading_lines.append("<b>⚠️ No unused accounts available in this category</b>")
+            heading_lines.append(
+                "<b>⚠️ No unused accounts available in this category</b>"
+            )
             logger.info(
                 "Get accounts by user %s for category %s requested=%s returned=0",
                 user_id,
                 data["category_name"],
                 amount,
             )
-            await update.effective_message.reply_text("\n".join(heading_lines), parse_mode=ParseMode.HTML)
+            await update.effective_message.reply_text(
+                "\n".join(heading_lines), parse_mode=ParseMode.HTML
+            )
             return
 
-        body = [fmt_account_block(idx, row["username"], row["password"], row["category"]) for idx, row in enumerate(available_rows, start=1)]
+        body = [
+            fmt_account_block(idx, row["username"], row["password"], row["category"])
+            for idx, row in enumerate(available_rows, start=1)
+        ]
 
         logger.info(
             "Get accounts by user %s for category %s requested=%s returned=%s session=%s",
@@ -2005,9 +2272,18 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("export", export))
     app.add_handler(MessageHandler(filters.COMMAND, unknown_command))
 
-    app.add_handler(CallbackQueryHandler(handle_category_callback, pattern=r"^(addcat|bulkcat|getcat|csvcat):"))
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_category_callback, pattern=r"^(addcat|bulkcat|getcat|csvcat):"
+        )
+    )
     app.add_handler(CallbackQueryHandler(handle_main_menu, pattern=r"^menu:"))
-    app.add_handler(CallbackQueryHandler(handle_session_callback, pattern=r"^(sess|pending|itemused|itemunused|accountpage|accounttoggle|listpage|delconfirm|delcancel|delcatconfirm|delcatcancel|delsessconfirm|bulkconfirm|bulkcancel|csvconfirm|csvcancel|search):"))
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_session_callback,
+            pattern=r"^(sess|pending|itemused|itemunused|accountpage|accounttoggle|listpage|delconfirm|delcancel|delcatconfirm|delcatcancel|delsessconfirm|bulkconfirm|bulkcancel|csvconfirm|csvcancel|search):",
+        )
+    )
     app.add_handler(MessageHandler(filters.Document.ALL, handle_csv_upload))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_error_handler(error_handler)

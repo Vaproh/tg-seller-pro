@@ -583,16 +583,35 @@ def set_item_used(item_id: int, used: bool) -> bool:
         (1 if used else 0, 1 if used else 0, item_id),
     )
     if cur.rowcount > 0:
-        conn.execute(
-            """
-            UPDATE accounts
-            SET used = ?, used_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END
-            WHERE id = (
-                SELECT account_id FROM retrieval_items WHERE id = ?
+        if used:
+            conn.execute(
+                """
+                UPDATE accounts
+                SET used = 1, used_at = CURRENT_TIMESTAMP
+                WHERE id = (
+                    SELECT account_id FROM retrieval_items WHERE id = ?
+                )
+                """,
+                (item_id,),
             )
-            """,
-            (1 if used else 0, 1 if used else 0, item_id),
-        )
+        else:
+            conn.execute(
+                """
+                UPDATE accounts
+                SET used = 0, used_at = NULL
+                WHERE id = (
+                    SELECT account_id FROM retrieval_items WHERE id = ?
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM retrieval_items ri
+                    WHERE ri.account_id = (
+                        SELECT account_id FROM retrieval_items WHERE id = ?
+                    )
+                    AND ri.id != ? AND ri.used = 1
+                )
+                """,
+                (item_id, item_id, item_id),
+            )
     conn.commit()
     conn.close()
     return cur.rowcount > 0
