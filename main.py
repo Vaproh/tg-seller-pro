@@ -70,7 +70,7 @@ def main():
     register_handlers(application)
 
     logger.info("Starting bot...")
-    application.run_polling(drop_pending_updates=True)
+    application.run_polling(drop_pending_updates=True, poll_interval=2, read_timeout=15, connect_timeout=15)
 
 
 if __name__ == "__main__":
