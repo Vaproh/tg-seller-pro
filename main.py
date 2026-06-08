@@ -16,7 +16,7 @@ root_logger = logging.getLogger()
 root_logger.setLevel(logging.WARNING)
 
 file_handler = RotatingFileHandler(
-    os.path.join(LOG_DIR, f"{config.BOT_NAME}.log"),
+    os.path.join(LOG_DIR, "reddit-seller-bot.log"),
     maxBytes=5 * 1024 * 1024,
     backupCount=5,
     encoding="utf-8",
@@ -33,7 +33,7 @@ root_logger.addHandler(console_handler)
 for name in ("telegram", "urllib3", "asyncio"):
     logging.getLogger(name).setLevel(logging.WARNING)
 
-logger = logging.getLogger(config.BOT_NAME)
+logger = logging.getLogger("reddit-seller-bot")
 logger.setLevel(logging.INFO)
 
 

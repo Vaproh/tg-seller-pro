@@ -208,8 +208,6 @@ Usage: /removeseller 123456789
 Bot configuration via .env:
 • BOT_TOKEN — Telegram bot token
 • ADMIN_USER_ID — Admin Telegram ID
-• BOT_NAME — Bot display name
-• SERVICE_NAME — Service name
 • DAILY_REPORT_HOUR — Report hour (0-23)
 • WEEKLY_REPORT_DAY — Report day
 • TIMEZONE — Timezone (default: Asia/Kolkata)""",

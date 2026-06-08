@@ -5,8 +5,6 @@ load_dotenv()
 
 ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID", "0"))
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
-BOT_NAME = os.getenv("BOT_NAME", "Reddit Account Vault").strip() or "Reddit Account Vault"
-SERVICE_NAME = os.getenv("SERVICE_NAME", "Reddit Accounts").strip() or "Reddit Accounts"
 
 CURRENCY = "₹"
 HIGH_VALUE_THRESHOLD = 500
