@@ -8,7 +8,7 @@ from database.sellers import get_seller_by_user_id
 
 
 async def buyers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not require_seller(update):
+    if not await require_seller(update):
         return
     user_id = update.effective_user.id
     role = get_user_role(user_id)
@@ -16,7 +16,7 @@ async def buyers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     seller_id = seller["id"] if seller else None
     buyers = get_buyers(seller_id=seller_id)
     if not buyers:
-        await update.message.reply_text("No buyers found.")
+        await update.message.reply_text("📭 No buyers found.")
         return
     text = "<b>👥 Buyers</b>\n\n"
     for b in buyers:
@@ -31,11 +31,11 @@ async def buyers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def buyer_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not require_seller(update):
+    if not await require_seller(update):
         return
     args = context.args
     if not args:
-        await update.message.reply_text("Usage: /buyer <name>")
+        await update.message.reply_text("📝 Usage: /buyer <name>")
         return
     buyer_name = " ".join(args)
     user_id = update.effective_user.id
@@ -44,7 +44,7 @@ async def buyer_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     seller_id = seller["id"] if seller else None
     sales = get_buyer_sales(buyer_name, seller_id=seller_id)
     if not sales:
-        await update.message.reply_text(f"No purchases found for '{esc(buyer_name)}'.")
+        await update.message.reply_text(f"📭 No purchases found for '{esc(buyer_name)}'.")
         return
     text = f"<b>👤 Buyer: {esc(buyer_name)}</b>\n\n"
     for s in sales:

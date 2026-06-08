@@ -7,11 +7,11 @@ import config
 
 
 async def inventory_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not require_seller(update):
+    if not await require_seller(update):
         return
     cats = list_categories()
     if not cats:
-        await update.message.reply_text("No categories found.")
+        await update.message.reply_text("📭 No categories found.")
         return
     from database.accounts import count_accounts
     from database.sales import count_sales, get_sales_summary

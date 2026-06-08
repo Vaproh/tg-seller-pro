@@ -7,7 +7,7 @@ import config
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not require_seller(update):
+    if not await require_seller(update):
         return
     role = get_user_role(update.effective_user.id)
     is_admin = role == "admin"
@@ -17,7 +17,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def mainmenu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not require_seller(update):
+    if not await require_seller(update):
         return
     role = get_user_role(update.effective_user.id)
     is_admin = role == "admin"
@@ -26,6 +26,6 @@ async def mainmenu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not require_seller(update):
+    if not await require_seller(update):
         return
-    await update.message.reply_text("pong")
+    await update.message.reply_text("🏓 pong")

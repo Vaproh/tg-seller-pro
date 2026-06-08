@@ -8,7 +8,7 @@ from database import export_accounts_csv
 
 
 async def export_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not require_admin(update):
+    if not await require_admin(update):
         return
     csv_data = export_accounts_csv()
     filename = f"accounts_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -28,11 +28,11 @@ async def export_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def backup_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not require_admin(update):
+    if not await require_admin(update):
         return
     from database.connection import DB_PATH
     if not os.path.exists(DB_PATH):
-        await update.message.reply_text("No database found.")
+        await update.message.reply_text("📭 No database found.")
         return
     filename = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
     filepath = os.path.join("/tmp", filename)

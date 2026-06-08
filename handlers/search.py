@@ -8,14 +8,14 @@ from database import search_accounts
 
 
 async def search_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not require_seller(update):
+    if not await require_seller(update):
         return
     args = context.args
     if args:
         term = " ".join(args)
         results = search_accounts(term=term)
         if not results:
-            await update.message.reply_text("No results found.")
+            await update.message.reply_text("📭 No results found.")
             return
         text = f"<b>🔎 {len(results)} results for '{esc(term)}':</b>\n\n"
         for acc in results[:20]:
@@ -26,7 +26,7 @@ async def search_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(text, parse_mode="HTML")
         return
     state.set(update.effective_user.id, "search_stage", "type")
-    await update.message.reply_text("Select search type:", reply_markup=search_type_keyboard())
+    await update.message.reply_text("🔎 Select search type:", reply_markup=search_type_keyboard())
 
 
 async def handle_search_type(update: Update, context: ContextTypes.DEFAULT_TYPE, search_type):
@@ -39,7 +39,7 @@ async def handle_search_type(update: Update, context: ContextTypes.DEFAULT_TYPE,
         "buyer": "buyer name", "tag": "tag",
         "notes": "notes keyword", "general": "search term",
     }
-    await update.callback_query.edit_message_text(f"Enter the {labels.get(search_type, 'value')}:")
+    await update.callback_query.edit_message_text(f"📝 Enter the {labels.get(search_type, 'value')}:")
 
 
 async def handle_search_value(update: Update, context: ContextTypes.DEFAULT_TYPE, value):
@@ -57,11 +57,15 @@ async def handle_search_value(update: Update, context: ContextTypes.DEFAULT_TYPE
         kwargs["status"] = value
     elif search_type == "notes":
         kwargs["notes_term"] = value
+    elif search_type == "buyer":
+        kwargs["buyer"] = value
+    elif search_type == "tag":
+        kwargs["tag"] = value
     else:
         kwargs["term"] = value
     results = search_accounts(**kwargs)
     if not results:
-        await update.message.reply_text("No results found.")
+        await update.message.reply_text("📭 No results found.")
         return
     text = f"<b>🔎 {len(results)} results:</b>\n\n"
     for acc in results[:20]:

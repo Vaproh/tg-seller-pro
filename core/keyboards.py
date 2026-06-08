@@ -136,7 +136,7 @@ def filter_keyboard():
             InlineKeyboardButton("Sold", callback_data="listfilter:sold"),
         ],
         [
-            InlineKeyboardButton("By Category", callback_data="listfilter:category"),
+            InlineKeyboardButton("By Category", callback_data="listfiltercat"),
         ]
     ])
 

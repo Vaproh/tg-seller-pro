@@ -8,9 +8,9 @@ from database.accounts import count_accounts
 
 
 async def report_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not require_admin(update):
+    if not await require_admin(update):
         return
-    await update.message.reply_text("Select a period:", reply_markup=report_period_keyboard())
+    await update.message.reply_text("📊 Select a period:", reply_markup=report_period_keyboard())
 
 
 async def handle_report_period(update: Update, context: ContextTypes.DEFAULT_TYPE, period):

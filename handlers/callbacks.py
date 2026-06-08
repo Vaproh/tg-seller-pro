@@ -40,7 +40,7 @@ async def _csv_show_preview(update, context, user_id, query):
     state.set(user_id, "csv_stage", "preview")
     accounts = build_accounts_from_csv(headers, csv_data, mapping)
     if not accounts:
-        await query.edit_message_text("No valid accounts found in CSV with the selected mapping.")
+        await query.edit_message_text("📭 No valid accounts found in CSV with the selected mapping.")
         return
     preview = accounts[:3]
     map_desc = []
@@ -98,43 +98,43 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Add account menu ───────────────────────────────────
     if data == "menu:add":
-        if not require_admin(update):
+        if not await require_admin(update):
             return
-        await query.edit_message_text("Add account:", reply_markup=add_menu_keyboard())
+        await query.edit_message_text("➕ Add account:", reply_markup=add_menu_keyboard())
         return
 
     if data == "menu:add:single":
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         state.set(user_id, "add_stage", "username")
-        await query.edit_message_text("Send the Reddit username:")
+        await query.edit_message_text("👤 Send the Reddit username:")
         return
 
     if data == "menu:add:bulk":
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         kb = category_keyboard("bulkcat")
         if not kb:
-            await query.edit_message_text("No categories. Create one first with /addcategory")
+            await query.edit_message_text("📂 No categories. Create one first with /addcategory")
             return
         state.set(user_id, "bulk_stage", "category")
-        await query.edit_message_text("Select a category for bulk import:", reply_markup=kb)
+        await query.edit_message_text("📂 Select a category for bulk import:", reply_markup=kb)
         return
 
     if data == "menu:add:csv":
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         kb = category_keyboard("csvcat")
         if not kb:
-            await query.edit_message_text("No categories. Create one first with /addcategory")
+            await query.edit_message_text("📂 No categories. Create one first with /addcategory")
             return
         state.set(user_id, "csv_stage", "category")
-        await query.edit_message_text("Select a category for CSV import:", reply_markup=kb)
+        await query.edit_message_text("📂 Select a category for CSV import:", reply_markup=kb)
         return
 
     # ── Add wizard callbacks ───────────────────────────────
     if data.startswith("add2fa:"):
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         val = data.split(":")[1] == "yes"
         state.set(user_id, "add_2fa", val)
@@ -147,7 +147,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data.startswith("addverified:"):
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         val = data.split(":")[1] == "yes"
         state.set(user_id, "add_verified", val)
@@ -159,7 +159,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data.startswith("addcat:"):
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         cat_id_str = data.split(":", 1)[1]
         try:
@@ -198,7 +198,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "addconfirm":
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         username = state.pop(user_id, "add_username")
         password = state.pop(user_id, "add_password")
@@ -224,7 +224,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "addcancel":
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         state.pop(user_id, "add_username", None)
         state.pop(user_id, "add_password", None)
@@ -242,14 +242,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "menu:preview":
         kb = category_keyboard("previewcat", include_all=True)
         if not kb:
-            await query.edit_message_text("No categories found.")
+            await query.edit_message_text("📭 No categories found.")
             return
-        await query.edit_message_text("Select a category:", reply_markup=kb)
+        await query.edit_message_text("📂 Select a category:", reply_markup=kb)
         return
 
     # ── Sell flow ──────────────────────────────────────────
     if data == "menu:sell":
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         seller = get_seller_by_user_id(user_id)
         if not seller:
@@ -257,15 +257,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         accounts = list_accounts(limit=20, status="active")
         if not accounts:
-            await query.edit_message_text("No available accounts to sell.")
+            await query.edit_message_text("📭 No available accounts to sell.")
             return
         state.set(user_id, "sell_stage", "select_account")
         kb = sell_accounts_keyboard(accounts, "sellselect")
-        await query.edit_message_text("Select an account to sell:", reply_markup=kb)
+        await query.edit_message_text("💰 Select an account to sell:", reply_markup=kb)
         return
 
     if data.startswith("sellselect:") or data.startswith("quick sell:"):
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         parts = data.split(":")
         try:
@@ -274,27 +274,27 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         account = get_account_by_id(account_id)
         if not account:
-            await query.edit_message_text("Account not found.")
+            await query.edit_message_text("🔍 Account not found.")
             return
         state.set(user_id, "sell_account_id", account_id)
         state.set(user_id, "sell_stage", "buyer")
         await query.edit_message_text(
-            f"Account: {esc(account['username'])}\n\nEnter buyer name:"
+            f"Account: {esc(account['username'])}\n\n👤 Enter buyer name:"
         )
         return
 
     if data == "sellconfirm":
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         seller = get_seller_by_user_id(user_id)
         if not seller:
-            await query.edit_message_text("You are not registered as a seller.")
+            await query.edit_message_text("⚠️ You are not registered as a seller.")
             return
         account_id = state.pop(user_id, "sell_account_id")
         buyer = state.pop(user_id, "sell_buyer")
         price = state.pop(user_id, "sell_price", 0)
         tags = state.pop(user_id, "sell_tags")
-        state.pop(user_id, "sell_stage")
+        state.pop(user_id, "sell_stage", None)
         if not account_id or not buyer:
             await query.edit_message_text("❌ Sell cancelled — missing data.")
             return
@@ -304,7 +304,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sale = get_sale_by_id(sale_id)
             receipt = fmt_receipt(sale)
             await query.edit_message_text(receipt, parse_mode="HTML")
-            await notify_admin(context, fmt_payment_notification(sale) if False else f"💰 New sale! #{sale_id} — {buyer} — ₹{price:.0f} — by {seller['name']}")
+            await notify_admin(context, f"💰 New sale! #{sale_id} — {buyer} — ₹{price:.0f} — by {seller['name']}")
             if price >= config.HIGH_VALUE_THRESHOLD:
                 await notify_admin(context, f"🔥 High-value sale! #{sale_id} — ₹{price:.0f} from {buyer} — by {seller['name']}")
         else:
@@ -322,7 +322,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Bulk sell ──────────────────────────────────────────
     if data.startswith("bulksellselect:"):
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         parts = data.split(":")
         try:
@@ -360,11 +360,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "bulksellconfirm":
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         seller = get_seller_by_user_id(user_id)
         if not seller:
-            await query.edit_message_text("You are not registered as a seller.")
+            await query.edit_message_text("⚠️ You are not registered as a seller.")
             return
         selected = state.pop(user_id, "bulksell_selected", [])
         buyer = state.pop(user_id, "bulksell_buyer")
@@ -391,7 +391,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Sales ──────────────────────────────────────────────
     if data == "menu:sales":
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         role = get_user_role(user_id)
         seller = get_seller_by_user_id(user_id) if role != "admin" else None
@@ -400,7 +400,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state.set(user_id, "sales_filter", None)
         total = count_sales(seller_id=seller_id)
         if total == 0:
-            await query.edit_message_text("No sales found.")
+            await query.edit_message_text("📭 No sales found.")
             return
         total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
         sales = get_sales(limit=PAGE_SIZE, offset=0, seller_id=seller_id)
@@ -411,52 +411,66 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"₹{s['price']:.0f} | {esc(s['payment_status'])} | "
                 f"{esc(dict(s).get('seller_name', '—'))}\n"
             )
-        kb = pagination_keyboard("salespage", 1, total_pages)
+        filter_buttons = [
+            InlineKeyboardButton("All", callback_data="salesfilter:all"),
+            InlineKeyboardButton("Pending", callback_data="salesfilter:pending"),
+            InlineKeyboardButton("Paid", callback_data="salesfilter:paid"),
+        ]
+        nav_buttons = []
+        if 1 > 1:
+            nav_buttons.append(InlineKeyboardButton("⬅️", callback_data="salespage:0"))
+        nav_buttons.append(InlineKeyboardButton(f"1/{total_pages}", callback_data="noop"))
+        if total_pages > 1:
+            nav_buttons.append(InlineKeyboardButton("➡️", callback_data="salespage:2"))
+        kb = InlineKeyboardMarkup([filter_buttons, nav_buttons])
         await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return
 
     # ── List accounts ──────────────────────────────────────
     if data == "menu:list":
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         state.set(user_id, "list_page", 1)
         state.set(user_id, "list_filter", None)
         total = count_accounts()
         if total == 0:
-            await query.edit_message_text("No accounts found.")
+            await query.edit_message_text("📭 No accounts found.")
             return
         total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
         accounts = list_accounts(limit=PAGE_SIZE, offset=0)
         text = f"<b>📋 Accounts (1/{total_pages})</b>\n\n"
         for acc in accounts:
             text += fmt_compact(acc) + "\n"
-        buttons = [
-            [
-                InlineKeyboardButton("All", callback_data="listfilter:all"),
-                InlineKeyboardButton("Available", callback_data="listfilter:available"),
-                InlineKeyboardButton("Sold", callback_data="listfilter:sold"),
-            ],
-            [
-                InlineKeyboardButton("By Category", callback_data="listfiltercat"),
-            ],
+        filter_row = [
+            InlineKeyboardButton("All", callback_data="listfilter:all"),
+            InlineKeyboardButton("Available", callback_data="listfilter:available"),
+            InlineKeyboardButton("Sold", callback_data="listfilter:sold"),
         ]
-        kb = InlineKeyboardMarkup(buttons)
-        nav_kb = pagination_keyboard("accountpage", 1, total_pages)
+        cat_row = [
+            InlineKeyboardButton("By Category", callback_data="listfiltercat"),
+        ]
+        nav_row = []
+        if 1 > 1:
+            nav_row.append(InlineKeyboardButton("⬅️", callback_data="accountpage:0"))
+        nav_row.append(InlineKeyboardButton(f"1/{total_pages}", callback_data="noop"))
+        if total_pages > 1:
+            nav_row.append(InlineKeyboardButton("➡️", callback_data="accountpage:2"))
+        kb = InlineKeyboardMarkup([filter_row, cat_row, nav_row])
         await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return
 
     if data == "listfiltercat":
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         kb = category_keyboard("listfiltercatpick")
         if not kb:
-            await query.edit_message_text("No categories found.")
+            await query.edit_message_text("📭 No categories found.")
             return
-        await query.edit_message_text("Select a category:", reply_markup=kb)
+        await query.edit_message_text("📂 Select a category:", reply_markup=kb)
         return
 
     if data.startswith("listfiltercatpick:"):
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         cat_id_str = data.split(":", 1)[1]
         try:
@@ -467,7 +481,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state.set(user_id, "list_page", 1)
         total = count_accounts(category_id=cat_id)
         if total == 0:
-            await query.edit_message_text("No accounts in this category.")
+            await query.edit_message_text("📭 No accounts in this category.")
             return
         total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
         accounts = list_accounts(limit=PAGE_SIZE, offset=0, category_id=cat_id)
@@ -475,7 +489,21 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = f"<b>📋 {cat_name} (1/{total_pages})</b>\n\n"
         for acc in accounts:
             text += fmt_compact(acc) + "\n"
-        kb = pagination_keyboard("accountpage", 1, total_pages)
+        filter_row = [
+            InlineKeyboardButton("All", callback_data="listfilter:all"),
+            InlineKeyboardButton("Available", callback_data="listfilter:available"),
+            InlineKeyboardButton("Sold", callback_data="listfilter:sold"),
+        ]
+        cat_row = [
+            InlineKeyboardButton("By Category", callback_data="listfiltercat"),
+        ]
+        nav_row = []
+        if 1 > 1:
+            nav_row.append(InlineKeyboardButton("⬅️", callback_data="accountpage:0"))
+        nav_row.append(InlineKeyboardButton(f"1/{total_pages}", callback_data="noop"))
+        if total_pages > 1:
+            nav_row.append(InlineKeyboardButton("➡️", callback_data="accountpage:2"))
+        kb = InlineKeyboardMarkup([filter_row, cat_row, nav_row])
         await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return
 
@@ -504,12 +532,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Sellers ────────────────────────────────────────────
     if data == "menu:sellers":
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         from database import list_sellers
         sellers = list_sellers()
         if not sellers:
-            await query.edit_message_text("No sellers registered.")
+            await query.edit_message_text("📭 No sellers registered.")
             return
         text = "<b>👥 Sellers</b>\n\n"
         for s in sellers:
@@ -523,15 +551,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Report ─────────────────────────────────────────────
     if data == "menu:report":
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         from core.keyboards import report_period_keyboard
-        await query.edit_message_text("Select a period:", reply_markup=report_period_keyboard())
+        await query.edit_message_text("📊 Select a period:", reply_markup=report_period_keyboard())
         return
 
     # ── Inventory ──────────────────────────────────────────
     if data == "menu:inventory":
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         from database.accounts import count_accounts as ca
         from database.sales import get_sales_summary
@@ -559,14 +587,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Settings ───────────────────────────────────────────
     if data == "menu:settings":
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         await query.edit_message_text("⚙️ Settings:", reply_markup=settings_keyboard())
         return
 
     # ── Export (safe for callback context) ─────────────────
     if data == "menu:export":
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         csv_data = export_accounts_csv()
         filename = f"accounts_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -587,11 +615,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "menu:backup":
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         from database.connection import DB_PATH
         if not os.path.exists(DB_PATH):
-            await context.bot.send_message(chat_id=user_id, text="No database found.")
+            await context.bot.send_message(chat_id=user_id, text="📭 No database found.")
             return
         filename = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
         filepath = os.path.join("/tmp", filename)
@@ -613,6 +641,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── Preview category selection ─────────────────────────
     if data.startswith("previewcat:"):
         cat_id_str = data.split(":", 1)[1]
+        if cat_id_str != "all":
+            try:
+                int(cat_id_str)
+            except ValueError:
+                return
         await handle_preview_category(update, context, cat_id_str)
         return
 
@@ -627,7 +660,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         cat_name = get_category_name(cat_id)
         if not cat_name:
-            await query.edit_message_text("Category not found.")
+            await query.edit_message_text("🔍 Category not found.")
             return
         state.set(user_id, "bulk_category", cat_id)
         state.set(user_id, "bulk_stage", "lines")
@@ -648,14 +681,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         state.set(user_id, "csv_category", cat_id)
         state.set(user_id, "csv_stage", "upload")
-        await query.edit_message_text("Upload a CSV file:")
+        await query.edit_message_text("📁 Upload a CSV file:")
         return
 
     # ── CSV column mapping ────────────────────────────────
     if data.startswith("csvcol:"):
-        if not require_admin(update):
+        if not await require_admin(update):
             return
-        col_idx = int(data.split(":")[1])
+        try:
+            col_idx = int(data.split(":")[1])
+        except (ValueError, IndexError):
+            return
         headers = state.get(user_id, "csv_headers", [])
         mapping = state.get(user_id, "csv_mapping", {})
         stage = state.get(user_id, "csv_stage")
@@ -732,7 +768,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data.startswith("csvskip:"):
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         field = data.split(":")[1]
         stage = state.get(user_id, "csv_stage")
@@ -781,7 +817,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── CSV confirm/cancel ─────────────────────────────────
     if data == "csvconfirm":
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         headers = state.pop(user_id, "csv_headers")
         csv_data = state.pop(user_id, "csv_data")
@@ -793,7 +829,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         accounts = build_accounts_from_csv(headers, csv_data, mapping)
         if not accounts:
-            await query.edit_message_text("No valid accounts found in CSV.")
+            await query.edit_message_text("📭 No valid accounts found in CSV.")
             return
         result = add_accounts_bulk(accounts, cat_id)
         cat_name = get_category_name(cat_id) or "—"
@@ -810,7 +846,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Delete confirm/cancel ──────────────────────────────
     if data.startswith("delconfirm:"):
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         parts = data.split(":")
         try:
@@ -822,7 +858,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if success:
             await query.edit_message_text(f"✅ Account #{account_id} deleted.")
         else:
-            await query.edit_message_text("Failed to delete account.")
+            await query.edit_message_text("❌ Failed to delete account.")
         return
 
     if data == "delcancel":
@@ -832,7 +868,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Bulk delete confirm/cancel ─────────────────────────
     if data == "bulkdelconfirm":
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         raw = state.pop(user_id, "bulk_delete_input", "")
         state.pop(user_id, "bulk_delete_mode", None)
@@ -868,7 +904,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Category delete confirm/cancel ─────────────────────
     if data.startswith("delcatconfirm:"):
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         cat_id_str = data.split(":", 1)[1]
         state.pop(user_id, "delete_category_confirm", None)
@@ -888,7 +924,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Mark paid ──────────────────────────────────────────
     if data.startswith("markpaid:"):
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         parts = data.split(":")
         try:
@@ -897,11 +933,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         sale = get_sale_by_id(sale_id)
         if not sale:
-            await query.edit_message_text("Sale not found.")
+            await query.edit_message_text("🔍 Sale not found.")
             return
         role = get_user_role(user_id)
         if role != "admin" and sale["seller_user_id"] != user_id:
-            await query.edit_message_text("You can only mark your own sales as paid.")
+            await query.edit_message_text("⚠️ You can only mark your own sales as paid.")
             return
         new_status = "paid" if sale["payment_status"] == "pending" else "pending"
         mark_payment(sale_id, new_status)
@@ -913,7 +949,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Void sale confirm/cancel ───────────────────────────
     if data.startswith("voidconfirm:"):
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         parts = data.split(":")
         try:
@@ -926,7 +962,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(f"✅ Sale #{sale_id} voided. Account returned to stock.")
             await notify_admin(context, fmt_void_notification(sale_id))
         else:
-            await query.edit_message_text("Failed to void sale.")
+            await query.edit_message_text("❌ Failed to void sale.")
         return
 
     if data == "voidcancel":
@@ -936,7 +972,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Account pagination ─────────────────────────────────
     if data.startswith("accountpage:"):
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         try:
             page = int(data.split(":")[1])
@@ -962,13 +998,27 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = f"<b>📋 Accounts ({page}/{total_pages})</b>\n\n"
         for acc in accounts:
             text += fmt_compact(acc) + "\n"
-        kb = pagination_keyboard("accountpage", page, total_pages)
+        filter_row = [
+            InlineKeyboardButton("All", callback_data="listfilter:all"),
+            InlineKeyboardButton("Available", callback_data="listfilter:available"),
+            InlineKeyboardButton("Sold", callback_data="listfilter:sold"),
+        ]
+        cat_row = [
+            InlineKeyboardButton("By Category", callback_data="listfiltercat"),
+        ]
+        nav_row = []
+        if page > 1:
+            nav_row.append(InlineKeyboardButton("⬅️", callback_data=f"accountpage:{page - 1}"))
+        nav_row.append(InlineKeyboardButton(f"{page}/{total_pages}", callback_data="noop"))
+        if page < total_pages:
+            nav_row.append(InlineKeyboardButton("➡️", callback_data=f"accountpage:{page + 1}"))
+        kb = InlineKeyboardMarkup([filter_row, cat_row, nav_row])
         await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return
 
     # ── List filter ────────────────────────────────────────
     if data.startswith("listfilter:") and not data.startswith("listfiltercat"):
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         f = data.split(":", 1)[1]
         state.set(user_id, "list_filter", f if f != "all" else None)
@@ -986,20 +1036,34 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             used_val = True
         total = count_accounts(used=used_val, category_id=cat_id)
         if total == 0:
-            await query.edit_message_text("No accounts found.")
+            await query.edit_message_text("📭 No accounts found.")
             return
         total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
         accounts = list_accounts(limit=PAGE_SIZE, offset=0, used=used_val, category_id=cat_id)
         text = f"<b>📋 Accounts (1/{total_pages})</b>\n\n"
         for acc in accounts:
             text += fmt_compact(acc) + "\n"
-        kb = pagination_keyboard("accountpage", 1, total_pages)
+        filter_row = [
+            InlineKeyboardButton("All", callback_data="listfilter:all"),
+            InlineKeyboardButton("Available", callback_data="listfilter:available"),
+            InlineKeyboardButton("Sold", callback_data="listfilter:sold"),
+        ]
+        cat_row = [
+            InlineKeyboardButton("By Category", callback_data="listfiltercat"),
+        ]
+        nav_row = []
+        if 1 > 1:
+            nav_row.append(InlineKeyboardButton("⬅️", callback_data="accountpage:0"))
+        nav_row.append(InlineKeyboardButton(f"1/{total_pages}", callback_data="noop"))
+        if total_pages > 1:
+            nav_row.append(InlineKeyboardButton("➡️", callback_data="accountpage:2"))
+        kb = InlineKeyboardMarkup([filter_row, cat_row, nav_row])
         await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return
 
     # ── Sales pagination ───────────────────────────────────
     if data.startswith("salespage:"):
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         try:
             page = int(data.split(":")[1])
@@ -1022,13 +1086,24 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"₹{s['price']:.0f} | {esc(s['payment_status'])} | "
                 f"{esc(dict(s).get('seller_name', '—'))}\n"
             )
-        kb = pagination_keyboard("salespage", page, total_pages)
+        filter_buttons = [
+            InlineKeyboardButton("All", callback_data="salesfilter:all"),
+            InlineKeyboardButton("Pending", callback_data="salesfilter:pending"),
+            InlineKeyboardButton("Paid", callback_data="salesfilter:paid"),
+        ]
+        nav_buttons = []
+        if page > 1:
+            nav_buttons.append(InlineKeyboardButton("⬅️", callback_data=f"salespage:{page - 1}"))
+        nav_buttons.append(InlineKeyboardButton(f"{page}/{total_pages}", callback_data="noop"))
+        if page < total_pages:
+            nav_buttons.append(InlineKeyboardButton("➡️", callback_data=f"salespage:{page + 1}"))
+        kb = InlineKeyboardMarkup([filter_buttons, nav_buttons])
         await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return
 
     # ── Sales filter ───────────────────────────────────────
     if data.startswith("salesfilter:"):
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         f = data.split(":", 1)[1]
         state.set(user_id, "sales_filter", f)
@@ -1039,7 +1114,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         status_val = f if f != "all" else None
         total = count_sales(seller_id=seller_id, status=status_val)
         if total == 0:
-            await query.edit_message_text("No sales found.")
+            await query.edit_message_text("📭 No sales found.")
             return
         total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
         sales = get_sales(limit=PAGE_SIZE, offset=0, seller_id=seller_id, status=status_val)
@@ -1050,13 +1125,24 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"₹{s['price']:.0f} | {esc(s['payment_status'])} | "
                 f"{esc(dict(s).get('seller_name', '—'))}\n"
             )
-        kb = pagination_keyboard("salespage", 1, total_pages)
+        filter_buttons = [
+            InlineKeyboardButton("All", callback_data="salesfilter:all"),
+            InlineKeyboardButton("Pending", callback_data="salesfilter:pending"),
+            InlineKeyboardButton("Paid", callback_data="salesfilter:paid"),
+        ]
+        nav_buttons = []
+        if 1 > 1:
+            nav_buttons.append(InlineKeyboardButton("⬅️", callback_data="salespage:0"))
+        nav_buttons.append(InlineKeyboardButton(f"1/{total_pages}", callback_data="noop"))
+        if total_pages > 1:
+            nav_buttons.append(InlineKeyboardButton("➡️", callback_data="salespage:2"))
+        kb = InlineKeyboardMarkup([filter_buttons, nav_buttons])
         await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return
 
     # ── Search type ────────────────────────────────────────
     if data.startswith("search:"):
-        if not require_seller(update):
+        if not await require_seller(update):
             return
         search_type = data.split(":", 1)[1]
         await handle_search_type(update, context, search_type)
@@ -1064,7 +1150,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Report period ──────────────────────────────────────
     if data.startswith("report:"):
-        if not require_admin(update):
+        if not await require_admin(update):
             return
         period = data.split(":", 1)[1]
         await handle_report_period(update, context, period)

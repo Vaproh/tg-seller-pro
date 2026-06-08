@@ -9,7 +9,7 @@ def normalize_name(name):
 def add_category(name, default_price=0):
     name = normalize_name(name)
     if not name:
-        return False, "Category name cannot be empty."
+        return False, "⚠️ Category name cannot be empty."
     conn = connect()
     try:
         conn.execute(
@@ -17,9 +17,9 @@ def add_category(name, default_price=0):
             (name, default_price),
         )
         conn.commit()
-        return True, f"Category '{name}' created."
+        return True, f"📂 Category '{name}' created."
     except sqlite3.IntegrityError:
-        return False, f"Category '{name}' already exists."
+        return False, f"📂 Category '{name}' already exists."
     finally:
         conn.close()
 
@@ -32,10 +32,10 @@ def delete_category(name):
             "SELECT id FROM categories WHERE LOWER(name) = LOWER(?)", (name,)
         ).fetchone()
         if not row:
-            return False, f"Category '{name}' not found."
+            return False, f"🔍 Category '{name}' not found."
         cat_id = row["id"]
         if name.lower() == "uncategorized":
-            return False, "Cannot delete the default category."
+            return False, "⚠️ Cannot delete the default category."
         default = conn.execute(
             "SELECT id FROM categories WHERE LOWER(name) = 'uncategorized'"
         ).fetchone()
@@ -46,7 +46,7 @@ def delete_category(name):
             )
         conn.execute("DELETE FROM categories WHERE id = ?", (cat_id,))
         conn.commit()
-        return True, f"Category '{name}' deleted. Accounts moved to 'uncategorized'."
+        return True, f"🗑️ Category '{name}' deleted. Accounts moved to 'uncategorized'."
     finally:
         conn.close()
 

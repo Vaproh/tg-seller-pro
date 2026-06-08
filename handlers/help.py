@@ -6,7 +6,7 @@ from core.help_content import HELP_MAIN_ADMIN, HELP_MAIN_SELLER, HELP_TOPICS
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not require_seller(update):
+    if not await require_seller(update):
         return
     args = context.args
     role = get_user_role(update.effective_user.id)

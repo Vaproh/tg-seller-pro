@@ -10,9 +10,9 @@ def add_seller(user_id, name, added_by):
             (user_id, name, added_by),
         )
         conn.commit()
-        return True, f"Seller '{name}' registered."
+        return True, f"👤 Seller '{name}' registered."
     except sqlite3.IntegrityError:
-        return False, f"User {user_id} is already a seller."
+        return False, f"⚠️ User {user_id} is already a seller."
     finally:
         conn.close()
 

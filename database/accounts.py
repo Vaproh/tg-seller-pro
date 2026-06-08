@@ -121,7 +121,8 @@ def count_accounts(used=None, category_id=None, status=None):
 
 
 def search_accounts(term=None, category=None, used=None, newest_first=True,
-                    username=None, password=None, status=None, notes_term=None):
+                    username=None, password=None, status=None, notes_term=None,
+                    buyer=None, tag=None):
     conn = connect()
     try:
         query = """
@@ -153,6 +154,21 @@ def search_accounts(term=None, category=None, used=None, newest_first=True,
         if notes_term:
             query += " AND a.notes LIKE ?"
             params.append(f"%{notes_term}%")
+        if buyer or tag:
+            query = """
+                SELECT a.*, c.name as category_name
+                FROM accounts a
+                JOIN categories c ON c.id = a.category_id
+                JOIN sales s ON s.account_id = a.id
+                WHERE 1=1
+            """
+            params = []
+            if buyer:
+                query += " AND LOWER(s.buyer_name) = LOWER(?)"
+                params.append(buyer)
+            if tag:
+                query += " AND s.tags LIKE ?"
+                params.append(f"%{tag}%")
         order = "DESC" if newest_first else "ASC"
         query += f" ORDER BY a.id {order}"
         return conn.execute(query, params).fetchall()

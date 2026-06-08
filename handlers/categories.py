@@ -6,11 +6,11 @@ from database import list_categories, add_category, delete_category
 
 
 async def categories_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not require_seller(update):
+    if not await require_seller(update):
         return
     cats = list_categories()
     if not cats:
-        await update.message.reply_text("No categories found.")
+        await update.message.reply_text("📭 No categories found.")
         return
     text = "<b>📂 Categories</b>\n\n"
     for cat in cats:
@@ -19,11 +19,11 @@ async def categories_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def addcategory_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not require_admin(update):
+    if not await require_admin(update):
         return
     args = context.args
     if not args:
-        await update.message.reply_text("Usage: /addcategory <name>")
+        await update.message.reply_text("📝 Usage: /addcategory <name>")
         return
     name = " ".join(args)
     success, msg = add_category(name)
@@ -31,11 +31,11 @@ async def addcategory_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def deletecategory_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not require_admin(update):
+    if not await require_admin(update):
         return
     args = context.args
     if not args:
-        await update.message.reply_text("Usage: /deletecategory <name>")
+        await update.message.reply_text("📝 Usage: /deletecategory <name>")
         return
     name = " ".join(args)
     success, msg = delete_category(name)
