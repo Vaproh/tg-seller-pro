@@ -266,9 +266,14 @@ Username → Password → Email → Email Pass → 2FA → Verified → Notes �
 
 **`/voidsale <id>`** — Cancel sale, account returns to available
 
-**`/marksold <id>`** — Mark account 🔴 sold
-**`/markunsold <id>`** — Mark account 🟢 available
-**`/markpendingpayment <id>`** — Mark account 🟡 pending
+**`/marksold <id,id,...>`** — Mark account(s) 🔴 sold
+**`/markunsold <id,id,...>`** — Mark account(s) 🟢 available
+**`/markpendingpayment <id,id,...>`** — Mark account(s) 🟡 pending
+
+**`/editsale`** — Edit sale details (buyer, price, status, notes):
+1. Pick: 🏷️ Sale ID or 📦 Account ID
+2. Enter ID(s), comma-separated
+3. Tap field to change → type new value → ✅ Done
 
 ### Other
 

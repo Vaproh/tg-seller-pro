@@ -187,6 +187,17 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         await query.edit_message_text("❌ Void cancelled.")
         return True
 
+    if data.startswith("editsale:mode:"):
+        mode = data.split(":")[-1]
+        state.set(user_id, "editsale_mode", mode)
+        if mode == "sale":
+            prompt = "🏷️ Enter sale ID(s), comma-separated:\n(e.g. SALE-X7K9M2P4)"
+        else:
+            prompt = "📦 Enter account ID(s), comma-separated:\n(e.g. 1,2,3)"
+        state.set(user_id, "editsale_stage", "awaiting_ids")
+        await query.edit_message_text(prompt)
+        return True
+
     if data.startswith("editsale:field:"):
         field = data.split(":")[-1]
         state.set(user_id, "editsale_field", field)

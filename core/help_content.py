@@ -196,20 +196,24 @@ Type /voidsale 123
 Lets you change buyer, price, payment status, or notes on existing sales.
 
 <b>How to use:</b>
-1. Type /editsale 123
-   (or multiple: /editsale 1,2,3)
-2. Tap a field to change:
+1. Type /editsale
+2. Pick: 🏷️ Sale ID or 📦 Account ID
+3. Enter ID(s), comma-separated
+4. Tap a field to change:
    • 👤 Buyer — type new name
    • 💰 Price — type new price
    • 📦 Status — pick paid/pending
    • 📝 Notes — type new notes
-3. Tap ✅ Done when finished
+5. Tap ✅ Done when finished
+
+<b>Sale IDs</b> look like: SALE-X7K9M2P4
+<b>Account IDs</b> are plain numbers: 1, 2, 3
 
 <b>Works with incomplete sales:</b>
 If an account was marked as sold directly (via /marksold) without buyer/price info, /editsale will create a draft sale record so you can fill in the details.
 
 <b>Notes:</b>
-- Accepts both sale IDs and account IDs
+- Accepts multiple IDs: /editsale → Account ID → 1,2,3
 - Changes apply to all IDs at once
 - Status change auto-updates account status
 - Pending changes shown before applying""",

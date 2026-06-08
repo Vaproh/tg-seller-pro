@@ -106,9 +106,10 @@ docker compose down
 ### Status Management
 | Command | Description |
 |---------|-------------|
-| `/marksold <id>` | Mark account as sold |
-| `/markunsold <id>` | Mark account as available |
-| `/markpendingpayment <id>` | Mark as pending payment |
+| `/marksold <id,id,...>` | Mark account(s) as sold |
+| `/markunsold <id,id,...>` | Mark account(s) as available |
+| `/markpendingpayment <id,id,...>` | Mark as pending payment |
+| `/editsale` | Edit sale details (buyer, price, status, notes) |
 
 ### Other
 | Command | Description |

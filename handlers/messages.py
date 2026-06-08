@@ -15,7 +15,8 @@ from database import (
     list_accounts, sell_account, get_category_name,
     delete_account, delete_accounts_by_ids, get_buyer_names,
 )
-from database.sales import update_sale, get_sale_by_id
+from database.sales import update_sale, get_sale_by_id, create_draft_sale
+from database import get_seller_by_user_id
 from utils.parsers import parse_bulk_lines, parse_csv_file
 from utils.csv_utils import detect_columns, build_accounts_from_csv
 from utils.notifications import notify_admin, fmt_bulk_import
@@ -24,6 +25,54 @@ import config
 logger = logging.getLogger(__name__)
 
 MAX_CSV_SIZE = 5 * 1024 * 1024
+
+
+async def _editsale_process_ids_text(update, context, text):
+    user_id = update.effective_user.id
+    mode = state.get(user_id, "editsale_mode")
+    state.pop(user_id, "editsale_mode")
+    ids = [x.strip() for x in text.split(",") if x.strip()]
+    seller = get_seller_by_user_id(user_id)
+    seller_id = seller["id"] if seller else None
+    valid_sales = []
+    invalid_ids = []
+    created_drafts = []
+    for id_str in ids:
+        if mode == "sale":
+            sale = get_sale_by_id(id_str)
+            if sale:
+                valid_sales.append(_d(sale))
+            else:
+                invalid_ids.append(id_str)
+        else:
+            try:
+                account_id = int(id_str)
+            except ValueError:
+                invalid_ids.append(id_str)
+                continue
+            account = get_account_by_id(account_id)
+            if account and _d(account).get("status") in ("sold", "pending_payment"):
+                draft_id = create_draft_sale(account_id, seller_id)
+                if draft_id:
+                    sale = get_sale_by_id(draft_id)
+                    if sale:
+                        valid_sales.append(_d(sale))
+                        created_drafts.append(account_id)
+                    else:
+                        invalid_ids.append(id_str)
+                else:
+                    invalid_ids.append(id_str)
+            else:
+                invalid_ids.append(id_str)
+    if not valid_sales:
+        await update.message.reply_text(f"⚠️ Not found: {', '.join(invalid_ids)}")
+        return
+    state.set(user_id, "editsale_ids", [s["id"] for s in valid_sales])
+    state.set(user_id, "editsale_pending", {})
+    from handlers.sell import _editsale_summary, _editsale_field_keyboard
+    text_msg = _editsale_summary(valid_sales, invalid_ids, created_drafts)
+    kb = _editsale_field_keyboard()
+    await update.message.reply_text(_truncate(text_msg), parse_mode="HTML", reply_markup=kb)
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -233,6 +282,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Edit sale flow ─────────────────────────────────────
     editsale_stage = state.get(user_id, "editsale_stage")
+    if editsale_stage == "awaiting_ids":
+        state.pop(user_id, "editsale_stage")
+        await _editsale_process_ids_text(update, context, text)
+        return
+
     if editsale_stage == "awaiting_fields":
         sale_ids = state.get(user_id, "editsale_ids", [])
         state.pop(user_id, "editsale_ids")

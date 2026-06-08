@@ -312,46 +312,56 @@ async def editsale_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_seller(update):
         return
     args = context.args
-    if not args:
-        await update.message.reply_text("📝 Usage: /editsale <id,id,...>")
+    if args:
+        await _editsale_process_ids(update, context, args[0])
         return
-    ids = [x.strip() for x in args[0].split(",") if x.strip()]
-    raw_ids = []
-    for id_str in ids:
-        try:
-            raw_ids.append(int(id_str))
-        except ValueError:
-            pass
-    if not raw_ids:
-        await update.message.reply_text("⚠️ No valid IDs.")
-        return
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🏷️ By Sale ID", callback_data="editsale:mode:sale")],
+        [InlineKeyboardButton("📦 By Account ID", callback_data="editsale:mode:account")],
+    ])
+    await update.message.reply_text(
+        "✏️ What would you like to edit?\n\n"
+        "🏷️ <b>Sale ID</b> — e.g. SALE-X7K9M2P4\n"
+        "📦 <b>Account ID</b> — sold/pending account number",
+        parse_mode="HTML",
+        reply_markup=kb,
+    )
+
+
+async def _editsale_process_ids(update, context, raw_input):
+    ids = [x.strip() for x in raw_input.split(",") if x.strip()]
     user_id = update.effective_user.id
     seller = get_seller_by_user_id(user_id)
     seller_id = seller["id"] if seller else None
     valid_sales = []
     invalid_ids = []
     created_drafts = []
-    for rid in raw_ids:
-        sale = get_sale_by_id(rid)
+    for id_str in ids:
+        sale = get_sale_by_id(id_str)
         if sale:
             valid_sales.append(_d(sale))
             continue
-        account = get_account_by_id(rid)
+        try:
+            account_id = int(id_str)
+        except ValueError:
+            invalid_ids.append(id_str)
+            continue
+        account = get_account_by_id(account_id)
         if account and _d(account).get("status") in ("sold", "pending_payment"):
-            draft_id = create_draft_sale(rid, seller_id)
+            draft_id = create_draft_sale(account_id, seller_id)
             if draft_id:
                 sale = get_sale_by_id(draft_id)
                 if sale:
                     valid_sales.append(_d(sale))
-                    created_drafts.append(rid)
+                    created_drafts.append(account_id)
                 else:
-                    invalid_ids.append(rid)
+                    invalid_ids.append(id_str)
             else:
-                invalid_ids.append(rid)
+                invalid_ids.append(id_str)
         else:
-            invalid_ids.append(rid)
+            invalid_ids.append(id_str)
     if not valid_sales:
-        await update.message.reply_text(f"⚠️ Not found: {', '.join(str(i) for i in invalid_ids)}")
+        await update.message.reply_text(f"⚠️ Not found: {', '.join(invalid_ids)}")
         return
     state.set(user_id, "editsale_ids", [s["id"] for s in valid_sales])
     state.set(user_id, "editsale_pending", {})
