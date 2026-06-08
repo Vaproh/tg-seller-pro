@@ -347,15 +347,19 @@ async def _editsale_process_ids(update, context, raw_input):
             invalid_ids.append(id_str)
             continue
         account = get_account_by_id(account_id)
-        if account and _d(account).get("status") in ("sold", "pending_payment"):
-            draft_id = create_draft_sale(account_id, seller_id)
-            if draft_id:
-                sale = get_sale_by_id(draft_id)
-                if sale:
-                    valid_sales.append(_d(sale))
-                    created_drafts.append(account_id)
-                else:
-                    invalid_ids.append(id_str)
+        if not account:
+            invalid_ids.append(id_str)
+            continue
+        status = _d(account).get("status")
+        if status not in ("sold", "pending_payment"):
+            invalid_ids.append(id_str)
+            continue
+        draft_id = create_draft_sale(account_id, seller_id)
+        if draft_id:
+            sale = get_sale_by_id(draft_id)
+            if sale:
+                valid_sales.append(_d(sale))
+                created_drafts.append(id_str)
             else:
                 invalid_ids.append(id_str)
         else:
@@ -371,13 +375,39 @@ async def _editsale_process_ids(update, context, raw_input):
 
 
 def _editsale_summary(sales, invalid_ids=None, created_drafts=None):
+    pending = {}
+    if sales:
+        user_id = None
+        text = "<b>✏️ Editing sales:</b>\n\n"
+        for s in sales:
+            ps = s.get("payment_status", "pending")
+            ps_emoji = "✅" if ps == "paid" else "🟡"
+            buyer = esc(s.get("buyer_name")) or "—"
+            price = s.get("price", 0) or 0
+            sale_code = s.get("sale_code", f"#{s.get('id', '')}")
+            text += (
+                f"• <b>{sale_code}</b> | {buyer} | "
+                f"₹{price:.0f} | {ps_emoji} {esc(ps)}\n"
+            )
+    else:
+        text = "<b>✏️ Editing sales:</b>\n\n"
+    if created_drafts:
+        text += f"\n📝 Created draft sale for account(s): {', '.join(str(i) for i in created_drafts)}"
+    if invalid_ids:
+        text += f"\n⚠️ Not found: {', '.join(invalid_ids)}"
+    return text
+
+
+def _editsale_summary_with_pending(sales, pending, invalid_ids=None, created_drafts=None):
     text = "<b>✏️ Editing sales:</b>\n\n"
     for s in sales:
-        ps = s.get("payment_status", "pending")
+        sid = s.get("id")
+        p = pending.get(sid, {})
+        ps = p.get("payment_status", s.get("payment_status", "pending"))
         ps_emoji = "✅" if ps == "paid" else "🟡"
-        buyer = esc(s.get("buyer_name")) or "—"
-        price = s.get("price", 0) or 0
-        sale_code = s.get("sale_code", f"#{s.get('id', '')}")
+        buyer = esc(p.get("buyer_name", s.get("buyer_name"))) or "—"
+        price = p.get("price", s.get("price", 0)) or 0
+        sale_code = s.get("sale_code", f"#{sid}")
         text += (
             f"• <b>{sale_code}</b> | {buyer} | "
             f"₹{price:.0f} | {ps_emoji} {esc(ps)}\n"
@@ -385,7 +415,7 @@ def _editsale_summary(sales, invalid_ids=None, created_drafts=None):
     if created_drafts:
         text += f"\n📝 Created draft sale for account(s): {', '.join(str(i) for i in created_drafts)}"
     if invalid_ids:
-        text += f"\n⚠️ Not found: {', '.join(str(i) for i in invalid_ids)}"
+        text += f"\n⚠️ Not found: {', '.join(invalid_ids)}"
     return text
 
 

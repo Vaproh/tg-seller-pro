@@ -359,17 +359,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pending[sid][editsale_field] = value
         state.set(user_id, "editsale_pending", pending)
         state.pop(user_id, "editsale_field")
-        from handlers.sell import _editsale_summary, _editsale_field_keyboard
+        from handlers.sell import _editsale_summary_with_pending, _editsale_field_keyboard
         sales = []
         for sid in sale_ids:
             sale = get_sale_by_id(sid)
             if sale:
-                s = _d(sale)
-                if s["id"] in pending:
-                    s.update(pending[s["id"]])
-                sales.append(s)
+                sales.append(_d(sale))
         display_value = value if value is not None else "(cleared)"
-        text_msg = _editsale_summary(sales)
+        text_msg = _editsale_summary_with_pending(sales, pending)
         text_msg += f"\n\n✅ Set {editsale_field} → <code>{esc(str(display_value))}</code> for all {len(sale_ids)} sale(s)"
         kb = _editsale_field_keyboard()
         await update.message.reply_text(_truncate(text_msg), parse_mode="HTML", reply_markup=kb)

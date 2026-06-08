@@ -227,12 +227,9 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         for sid in sale_ids:
             sale = get_sale_by_id(sid)
             if sale:
-                s = _d(sale)
-                if s["id"] in pending:
-                    s.update(pending[s["id"]])
-                sales.append(s)
-        from handlers.sell import _editsale_summary, _editsale_field_keyboard
-        text = _editsale_summary(sales)
+                sales.append(_d(sale))
+        from handlers.sell import _editsale_summary_with_pending, _editsale_field_keyboard
+        text = _editsale_summary_with_pending(sales, pending)
         if pending:
             text += "\n\n<b>Pending changes:</b>\n"
             for sid, fields in pending.items():
@@ -253,16 +250,13 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             pending[sid][field] = value
         state.set(user_id, "editsale_pending", pending)
         state.pop(user_id, "editsale_field")
-        from handlers.sell import _editsale_summary, _editsale_field_keyboard
+        from handlers.sell import _editsale_summary_with_pending, _editsale_field_keyboard
         sales = []
         for sid in sale_ids:
             sale = get_sale_by_id(sid)
             if sale:
-                s = _d(sale)
-                if s["id"] in pending:
-                    s.update(pending[s["id"]])
-                sales.append(s)
-        text = _editsale_summary(sales)
+                sales.append(_d(sale))
+        text = _editsale_summary_with_pending(sales, pending)
         text += f"\n\n✅ Set {field} → <code>{esc(value)}</code> for all {len(sale_ids)} sale(s)"
         kb = _editsale_field_keyboard()
         await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
