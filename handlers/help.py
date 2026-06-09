@@ -20,6 +20,21 @@ TOPIC_EMOJIS = {
     "ping": "🏓", "status": "📊", "filter": "🔍", "settings": "⚙️",
 }
 
+TOPIC_NAMES = {
+    "sell": "Sell", "bulksell": "Bulk Sell", "sales": "Sales", "sale": "Sale",
+    "markpaid": "Mark Paid", "marksold": "Mark Sold", "markunsold": "Mark Unsold",
+    "markpendingpayment": "Mark Pending", "voidsale": "Void Sale",
+    "list": "List", "search": "Search", "getid": "Get ID",
+    "add": "Add Account", "bulkadd": "Bulk Add", "extractcsv": "CSV Export",
+    "delete": "Delete", "bulkdelete": "Bulk Delete",
+    "preview": "Preview", "categories": "Categories", "addcategory": "Add Category",
+    "deletecategory": "Delete Category",
+    "inventory": "Inventory", "buyers": "Buyers", "buyer": "Buyer",
+    "report": "Report", "addseller": "Add Seller", "removeseller": "Remove Seller",
+    "listsellers": "List Sellers", "export": "Export", "backup": "Backup",
+    "ping": "Ping", "status": "Status", "filter": "Filter", "settings": "Settings",
+}
+
 COMMAND_TO_TOPIC = {
     "sell": "sell", "bulksell": "bulksell", "sales": "sales", "sale": "sale",
     "markpaid": "markpaid", "marksold": "marksold", "markunsold": "markunsold",
@@ -46,8 +61,9 @@ def _topics_keyboard():
         if topic not in HELP_TOPICS:
             continue
         emoji = TOPIC_EMOJIS.get(topic, "📖")
+        name = TOPIC_NAMES.get(topic, topic.title())
         row.append(InlineKeyboardButton(
-            f"{emoji} {topic.title()}",
+            f"{emoji} {name}",
             callback_data=f"help:{topic}",
         ))
         if len(row) == 2:
@@ -71,7 +87,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cmd = args[0].lower().lstrip("/")
     topic = COMMAND_TO_TOPIC.get(cmd, cmd)
     if topic in HELP_TOPICS:
-        emoji = TOPIC_EMOJIS.get(topic, "📖")
         kb = _topics_keyboard()
         await update.message.reply_text(HELP_TOPICS[topic], parse_mode="HTML", reply_markup=kb)
     else:
@@ -86,7 +101,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, topic):
     query = update.callback_query
     if topic in HELP_TOPICS:
-        emoji = TOPIC_EMOJIS.get(topic, "📖")
         kb = _topics_keyboard()
         await query.edit_message_text(HELP_TOPICS[topic], parse_mode="HTML", reply_markup=kb)
     else:

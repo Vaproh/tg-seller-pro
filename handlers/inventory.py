@@ -2,6 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller
 from core.format import esc
+from core.state import state
 from core.filters import (
     filter_page_keyboard, apply_list_filters, count_from_filter,
     fmt_account_list_page, parse_filter_state, build_filter_state, PAGE_SIZE,
@@ -15,7 +16,6 @@ async def inventory_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_seller(update):
         return
     user_id = update.effective_user.id
-    from core.state import state
     state.set(user_id, "inv_filter", None)
     state.set(user_id, "inv_page", 1)
     cats = list_categories()
@@ -30,8 +30,8 @@ async def inventory_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text += f"🟢 Available: {available}\n"
     text += f"🔴 Sold: {sold}\n"
     text += f"🟡 Pending Payment: {pending}\n"
-    text += f"💰 Total revenue: ₹{summary.get('total_revenue', 0):.0f}\n"
-    text += f"💳 Pending: ₹{summary.get('pending_amount', 0):.0f}\n\n"
+    text += f"💰 Total revenue: {config.CURRENCY}{summary.get('total_revenue', 0):.0f}\n"
+    text += f"💳 Pending: {config.CURRENCY}{summary.get('pending_amount', 0):.0f}\n\n"
     text += "<b>📂 By Category:</b>\n"
     for cat in cats:
         cat_avail = count_accounts(category_id=cat["id"], status="available")
@@ -49,6 +49,9 @@ async def inventory_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ],
         [
             InlineKeyboardButton("📂 By Category", callback_data="invfiltercat"),
+        ],
+        [
+            InlineKeyboardButton("⬅️ Back", callback_data="menu:back"),
         ],
     ])
     await update.message.reply_text(text, parse_mode="HTML", reply_markup=kb)

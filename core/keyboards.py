@@ -8,7 +8,7 @@ def category_keyboard(callback_prefix, include_all=False):
     buttons = []
     row = []
     if include_all:
-        row.append(InlineKeyboardButton("All", callback_data=f"{callback_prefix}:all"))
+        row.append(InlineKeyboardButton("📋 All", callback_data=f"{callback_prefix}:all"))
     for cat in cats:
         label = f"{cat['name']} ({cat['account_count']})"
         row.append(InlineKeyboardButton(label, callback_data=f"{callback_prefix}:{cat['id']}"))
@@ -68,8 +68,8 @@ def confirm_keyboard(confirm_data, cancel_data):
 def yes_no_keyboard(callback_prefix):
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("Yes", callback_data=f"{callback_prefix}:yes"),
-            InlineKeyboardButton("No", callback_data=f"{callback_prefix}:no"),
+            InlineKeyboardButton("✅ Yes", callback_data=f"{callback_prefix}:yes"),
+            InlineKeyboardButton("❌ No", callback_data=f"{callback_prefix}:no"),
         ]
     ])
 
@@ -77,11 +77,11 @@ def yes_no_keyboard(callback_prefix):
 def add_menu_keyboard():
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("Single", callback_data="menu:add:single"),
-            InlineKeyboardButton("Bulk", callback_data="menu:add:bulk"),
+            InlineKeyboardButton("👤 Single", callback_data="menu:add:single"),
+            InlineKeyboardButton("📥 Bulk", callback_data="menu:add:bulk"),
         ],
         [
-            InlineKeyboardButton("CSV Import", callback_data="menu:add:csv"),
+            InlineKeyboardButton("📄 CSV Import", callback_data="menu:add:csv"),
         ],
         [
             InlineKeyboardButton("⬅️ Back", callback_data="menu:back"),
@@ -108,12 +108,12 @@ def settings_keyboard():
 def report_period_keyboard():
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("Today", callback_data="report:today"),
-            InlineKeyboardButton("This Week", callback_data="report:week"),
+            InlineKeyboardButton("📅 Today", callback_data="report:today"),
+            InlineKeyboardButton("📅 This Week", callback_data="report:week"),
         ],
         [
-            InlineKeyboardButton("This Month", callback_data="report:month"),
-            InlineKeyboardButton("All Time", callback_data="report:all"),
+            InlineKeyboardButton("📅 This Month", callback_data="report:month"),
+            InlineKeyboardButton("📅 All Time", callback_data="report:all"),
         ]
     ])
 

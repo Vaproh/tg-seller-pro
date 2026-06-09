@@ -15,76 +15,93 @@ scheduler = AsyncIOScheduler(timezone=config.TIMEZONE)
 
 
 def _build_daily_report():
-    today = get_sales_summary(period="today")
-    week = get_sales_summary(period="week")
-    available = count_accounts(status="available")
-    sold = count_accounts(status="sold")
-    pending = count_accounts(status="pending_payment")
-    sellers = list_sellers()
+    try:
+        today = get_sales_summary(period="today")
+        available = count_accounts(status="available")
+        sold = count_accounts(status="sold")
+        pending = count_accounts(status="pending_payment")
+        sellers = list_sellers()
 
-    now = datetime.now().strftime("%Y-%m-%d")
-    lines = [
-        f"📊 Daily Sales Report — {now}",
-        "",
-        f"💰 Revenue today: ₹{today.get('total_revenue', 0):.0f}",
-        f"📈 Sales today: {today.get('total_sales', 0)}",
-        f"💳 Pending payments: {today.get('pending_count', 0)} (₹{today.get('pending_amount', 0):.0f})",
-        f"📦 Inventory: 🟢{available} 🔴{sold} 🟡{pending}",
-        "",
-        "By seller:",
-    ]
-    for s in sellers:
-        if s["sale_count"] > 0:
-            lines.append(f"• {s['name']}: {s['sale_count']} sales, ₹{s['total_earnings']:.0f}")
-    if not any(s["sale_count"] > 0 for s in sellers):
-        lines.append("• No sales yet")
-    return "\n".join(lines)
+        now = datetime.now().strftime("%Y-%m-%d")
+        lines = [
+            f"📊 <b>Daily Sales Report — {now}</b>",
+            "",
+            f"💰 Revenue today: {config.CURRENCY}{today.get('total_revenue', 0):.0f}",
+            f"📈 Sales today: {today.get('total_sales', 0)}",
+            f"💳 Pending payments: {today.get('pending_count', 0)} ({config.CURRENCY}{today.get('pending_amount', 0):.0f})",
+            f"📦 Inventory: 🟢{available} 🔴{sold} 🟡{pending}",
+            "",
+            "<b>By seller:</b>",
+        ]
+        has_sales = False
+        for s in sellers:
+            if s.get("sale_count", 0) > 0:
+                lines.append(f"• {s['name']}: {s['sale_count']} sales, {config.CURRENCY}{s['total_earnings']:.0f}")
+                has_sales = True
+        if not has_sales:
+            lines.append("• No sales yet")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error("Failed to build daily report: %s", e)
+        return f"📊 Daily report failed to generate: {e}"
 
 
 def _build_weekly_report():
-    week = get_sales_summary(period="week")
-    total = get_sales_summary()
-    available = count_accounts(status="available")
-    sold = count_accounts(status="sold")
-    pending = count_accounts(status="pending_payment")
-    sellers = list_sellers()
+    try:
+        week = get_sales_summary(period="week")
+        total = get_sales_summary()
+        available = count_accounts(status="available")
+        sold = count_accounts(status="sold")
+        pending = count_accounts(status="pending_payment")
+        sellers = list_sellers()
 
-    now = datetime.now().strftime("%Y-%m-%d")
-    lines = [
-        f"📊 Weekly Sales Report — {now}",
-        "",
-        f"💰 Revenue this week: ₹{week.get('total_revenue', 0):.0f}",
-        f"📈 Sales this week: {week.get('total_sales', 0)}",
-        f"💳 Pending payments: {week.get('pending_count', 0)} (₹{week.get('pending_amount', 0):.0f})",
-        f"📦 Inventory: 🟢{available} 🔴{sold} 🟡{pending}",
-        f"💰 All-time revenue: ₹{total.get('total_revenue', 0):.0f}",
-        "",
-        "By seller:",
-    ]
-    for s in sellers:
-        if s["sale_count"] > 0:
-            lines.append(f"• {s['name']}: {s['sale_count']} sales, ₹{s['total_earnings']:.0f}")
-    if not any(s["sale_count"] > 0 for s in sellers):
-        lines.append("• No sales yet")
-    return "\n".join(lines)
+        now = datetime.now().strftime("%Y-%m-%d")
+        lines = [
+            f"📊 <b>Weekly Sales Report — {now}</b>",
+            "",
+            f"💰 Revenue this week: {config.CURRENCY}{week.get('total_revenue', 0):.0f}",
+            f"📈 Sales this week: {week.get('total_sales', 0)}",
+            f"💳 Pending payments: {week.get('pending_count', 0)} ({config.CURRENCY}{week.get('pending_amount', 0):.0f})",
+            f"📦 Inventory: 🟢{available} 🔴{sold} 🟡{pending}",
+            f"💰 All-time revenue: {config.CURRENCY}{total.get('total_revenue', 0):.0f}",
+            "",
+            "<b>By seller:</b>",
+        ]
+        has_sales = False
+        for s in sellers:
+            if s.get("sale_count", 0) > 0:
+                lines.append(f"• {s['name']}: {s['sale_count']} sales, {config.CURRENCY}{s['total_earnings']:.0f}")
+                has_sales = True
+        if not has_sales:
+            lines.append("• No sales yet")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error("Failed to build weekly report: %s", e)
+        return f"📊 Weekly report failed to generate: {e}"
 
 
 def _build_pending_payment_report():
-    pending = get_sales(limit=50, status="pending")
-    if not pending:
+    try:
+        pending = get_sales(limit=50, status="pending")
+        if not pending:
+            return None
+        total_pending = sum(s.get("price", 0) for s in pending)
+        lines = [
+            f"🟡 <b>Pending Payment Reminder — {len(pending)} sales ({config.CURRENCY}{total_pending:.0f})</b>",
+            "",
+        ]
+        for s in pending:
+            sale_code = s.get("sale_code", f"#{s.get('id', '?')}")
+            lines.append(
+                f"• {code(sale_code)} | {code(s.get('buyer_name', '—'))} | "
+                f"{config.CURRENCY}{s.get('price', 0):.0f} | {str(s.get('sold_at', ''))[:10]}"
+            )
+        lines.append("")
+        lines.append("Use /markpaid to confirm payment.")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error("Failed to build pending payment report: %s", e)
         return None
-    total_pending = sum(s["price"] for s in pending)
-    lines = [
-        f"🟡 Pending Payment Reminder — {len(pending)} sales (₹{total_pending:.0f})",
-        "",
-    ]
-    for s in pending:
-        lines.append(
-            f"• {code(f'#{s['id']}')} | {code(s['buyer_name'])} | ₹{s['price']:.0f} | {str(s['sold_at'])[:10]}"
-        )
-    lines.append("")
-    lines.append("Use /markpaid to confirm payment.")
-    return "\n".join(lines)
 
 
 async def daily_report_job(context):
@@ -155,5 +172,6 @@ def setup_scheduler(application):
         replace_existing=True,
     )
 
-    scheduler.start()
+    if not scheduler.running:
+        scheduler.start()
     logger.info("Scheduler started.")

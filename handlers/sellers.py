@@ -1,9 +1,11 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_admin
 from core.format import esc, code_id
 from database import add_seller, remove_seller, list_sellers
+from database.sellers import get_seller_by_user_id
 from utils.notifications import notify_admin, fmt_seller_added, fmt_seller_removed
+import config
 
 
 async def addseller_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -37,10 +39,15 @@ async def removeseller_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("⚠️ Invalid user ID.")
         return
+    seller = get_seller_by_user_id(user_id)
+    seller_name = esc(seller["name"]) if seller else "—"
     success = remove_seller(user_id)
     if success:
-        await update.message.reply_text(f"✅ Seller {code_id(user_id)} removed.")
-        await notify_admin(context, fmt_seller_removed("—", user_id))
+        await update.message.reply_text(
+            f"✅ Seller {code_id(user_id)} removed.",
+            parse_mode="HTML",
+        )
+        await notify_admin(context, fmt_seller_removed(seller_name, user_id))
     else:
         await update.message.reply_text("🔍 Seller not found.")
 
@@ -56,7 +63,10 @@ async def listsellers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for s in sellers:
         status = "🟢" if s["active"] else "🔴"
         text += (
-            f"{status} {esc(s['name'])} (ID: {code_id(s['user_id'])}) — "
-            f"{s['sale_count']} sales, ₹{s['total_earnings']:.0f}\n"
+            f"{status} {esc(s['name'])} — ID: {code_id(s['user_id'])}\n"
+            f"   📊 {s['sale_count']} sales — {config.CURRENCY}{s['total_earnings']:.0f}\n"
         )
-    await update.message.reply_text(text, parse_mode="HTML")
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⬅️ Back", callback_data="menu:back")],
+    ])
+    await update.message.reply_text(text, parse_mode="HTML", reply_markup=kb)
