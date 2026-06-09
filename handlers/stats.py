@@ -135,24 +135,17 @@ async def stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, dat
             await query.edit_message_text("📭 No data to generate charts.")
             return True
 
+        labels = ["📈 Revenue Over Time", "📂 By Category", "💳 Payment Status", "🏆 Top Buyers", "👨‍💼 Top Sellers"]
         for i, buf in enumerate(charts):
             buf.seek(0)
-            caption = None
-            if i == 0:
-                caption = "📈 Revenue Over Time"
-            elif i == 1:
-                caption = "📂 By Category"
-            elif i == 2:
-                caption = "💳 Payment Status"
-            elif i == 3:
-                caption = "🏆 Top Buyers"
-            elif i == 4:
-                caption = "👨‍💼 Top Sellers"
-            await context.bot.send_photo(
-                chat_id=update.effective_chat.id,
-                photo=buf,
-                caption=caption,
-            )
+            try:
+                await context.bot.send_photo(
+                    chat_id=update.effective_chat.id,
+                    photo=buf,
+                    caption=labels[i] if i < len(labels) else None,
+                )
+            except Exception:
+                pass
 
         kb = _stats_period_keyboard()
         await context.bot.send_message(
