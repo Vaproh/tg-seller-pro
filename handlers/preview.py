@@ -35,7 +35,7 @@ async def handle_preview_category(update: Update, context: ContextTypes.DEFAULT_
         return
     state.set(query.from_user.id, "preview_category", cat_id)
     state.set(query.from_user.id, "preview_stage", "count")
-    await query.edit_message_text(f"📂 Category: {code(cat_name)}\n🔢 How many accounts to pull?")
+    await query.edit_message_text(f"📂 Category: {code(cat_name)}\n🔢 How many accounts to pull?", parse_mode="HTML")
 
 
 async def handle_preview_count(update: Update, context: ContextTypes.DEFAULT_TYPE, count_str):

@@ -10,6 +10,7 @@ from database.accounts import add_account
 
 async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str, user_id: int) -> bool:
     query = update.callback_query
+    await query.answer()
 
     if data == "menu:add":
         if not await require_admin(update):
@@ -131,7 +132,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             has_2fa=has_2fa, is_verified=is_verified, notes=notes,
         )
         if success:
-            await query.edit_message_text(f"✅ Account saved! (ID: #{code_id(acc_id)})")
+            await query.edit_message_text(f"✅ Account saved! (ID: #{code_id(acc_id)})", parse_mode="HTML")
         else:
             await query.edit_message_text(f"❌ {msg}")
         return True

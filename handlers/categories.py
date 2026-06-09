@@ -3,6 +3,7 @@ from telegram.ext import ContextTypes
 from core.permissions import require_admin, require_seller
 from core.format import esc
 from database import list_categories, add_category, delete_category
+import config
 
 
 async def categories_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -14,7 +15,7 @@ async def categories_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     text = "<b>📂 Categories</b>\n\n"
     for cat in cats:
-        text += f"• {esc(cat['name'])} — {cat['account_count']} accounts — ₹{cat['default_price']:.0f}\n"
+        text += f"• {esc(cat['name'])} — {cat['account_count']} accounts — {config.CURRENCY}{cat['default_price']:.0f}\n"
     await update.message.reply_text(text, parse_mode="HTML")
 
 

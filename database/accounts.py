@@ -106,13 +106,17 @@ def list_accounts(limit=20, offset=0, status=None, category_id=None,
         conn.close()
 
 
-def get_available_account_ids(limit):
+def get_available_account_ids(limit, category_id=None):
     conn = connect()
     try:
-        rows = conn.execute(
-            "SELECT id FROM accounts WHERE status = 'available' ORDER BY id DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        query = "SELECT id FROM accounts WHERE status = 'available'"
+        params = []
+        if category_id is not None:
+            query += " AND category_id = ?"
+            params.append(category_id)
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(limit)
+        rows = conn.execute(query, params).fetchall()
         return [r["id"] for r in rows]
     finally:
         conn.close()
@@ -145,7 +149,7 @@ def count_accounts(status=None, category_id=None, status_list=None, id_list=None
 
 def search_accounts(term=None, category=None, status=None, newest_first=True,
                     username=None, password=None, notes_term=None,
-                    buyer=None, tag=None, category_id=None, status_list=None,
+                    tag=None, category_id=None, status_list=None,
                     id_list=None):
     conn = connect()
     try:
@@ -186,15 +190,9 @@ def search_accounts(term=None, category=None, status=None, newest_first=True,
         if notes_term:
             query += " AND a.notes LIKE ?"
             params.append(f"%{notes_term}%")
-        if buyer or tag:
-            query += " AND a.id IN (SELECT s.account_id FROM sales s WHERE 1=1"
-            if buyer:
-                query += " AND LOWER(s.buyer_name) = LOWER(?)"
-                params.append(buyer)
-            if tag:
-                query += " AND s.tags LIKE ?"
-                params.append(f"%{tag}%")
-            query += ")"
+        if tag:
+            query += " AND a.id IN (SELECT s.account_id FROM sales s WHERE s.tags LIKE ?)"
+            params.append(f"%{tag}%")
         order = "DESC" if newest_first else "ASC"
         query += f" ORDER BY a.id {order}"
         return conn.execute(query, params).fetchall()

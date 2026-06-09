@@ -13,8 +13,7 @@ HELP_MAIN_ADMIN = """<b>📖 Help — Admin</b>
 /getid — See one account
 
 <b>💰 Sell</b>
-/sell — Sell one account
-/bulksell — Sell many at once
+/sell — Sell accounts
 /sales — See all sales
 /sale — See one sale
 /markpaid — Mark as paid
@@ -25,13 +24,11 @@ HELP_MAIN_ADMIN = """<b>📖 Help — Admin</b>
 /editsale — Edit sale details
 
 <b>📂 Other</b>
-/preview — Show accounts to buyer
+/preview — Show accounts from a category
 /categories — See all categories
 /addcategory — Make new category
 /deletecategory — Remove category
 /inventory — What's in stock
-/buyers — See all buyers
-/buyer — See one buyer's orders
 /report — Money report
 
 <b>👤 Team</b>
@@ -57,8 +54,7 @@ HELP_MAIN_SELLER = """<b>📖 Help — Seller</b>
 /getid — See one account
 
 <b>💰 Sell</b>
-/sell — Sell one account
-/bulksell — Sell many at once
+/sell — Sell accounts
 /sales — See your sales
 /sale — See one sale
 /markpaid — Mark as paid
@@ -68,11 +64,9 @@ HELP_MAIN_SELLER = """<b>📖 Help — Seller</b>
 /editsale — Edit sale details
 
 <b>📂 Other</b>
-/preview — Show accounts to buyer
+/preview — Show accounts from a category
 /categories — See all categories
 /inventory — What's in stock
-/buyers — See all buyers
-/buyer — See one buyer's orders
 
 <b>⚙️ Tools</b>
 /stats — Revenue stats & charts
@@ -83,45 +77,26 @@ Type <b>/help command</b> for details on any command.
 Example: <b>/help sell</b>"""
 
 HELP_TOPICS = {
-    "sell": """<b>💰 /sell — Sell an Account</b>
+    "sell": """<b>💰 /sell — Sell Accounts</b>
 
 <b>What it does:</b>
-Lets you sell an account to a buyer.
+Lets you sell one or more accounts.
 
 <b>How to use:</b>
 1. Type /sell
-2. Pick mode:
-   • <b>Pick account:</b> tap to select one
-   • <b>Pick any:</b> auto-picks one available account
-3. Pick a buyer or type their name
+2. Pick a category (or 📋 All)
+3. Pick mode:
+   • <b>Pick accounts:</b> tap to select multiple
+   • <b>Enter number:</b> type how many (auto-picks)
 4. Type the price
-5. Pick: 🟢 Sold or 🟡 Waiting for money
+5. Pick: 🔴 Sold or 🟡 Pending payment
 6. Confirm
 
 <b>Notes:</b>
 - Only 🟢 available accounts show up
-- Price must be typed (no skipping)
-- Buyer names are saved for next time""",
-
-    "bulksell": """<b>💰 /bulksell — Sell Many Accounts</b>
-
-<b>What it does:</b>
-Sell multiple accounts to one buyer at once.
-
-<b>How to use:</b>
-1. Type /bulksell
-2. Pick mode:
-   • <b>Select:</b> tap accounts to pick them
-   • <b>Number:</b> type how many (auto-picks available accounts)
-3. Pick buyer
-4. Type price per account
-5. Pick status: 🟢 or 🟡
-6. Confirm
-
-<b>Notes:</b>
 - Tap accounts to toggle selection
 - Use ⬅️ ➡️ to go between pages
-- Same flow as /sell but for multiple accounts""",
+- Price must be typed (no skipping)""",
 
     "sales": """<b>📈 /sales — View Sales</b>
 
@@ -202,14 +177,13 @@ Type /voidsale 123
     "editsale": """<b>✏️ /editsale — Edit Sale Details</b>
 
 <b>What it does:</b>
-Lets you change buyer, price, payment status, or notes on existing sales.
+Lets you change price, payment status, or notes on existing sales.
 
 <b>How to use:</b>
 1. Type /editsale
 2. Pick: 🏷️ Sale ID or 📦 Account ID
 3. Enter ID(s), comma-separated
 4. Tap a field to change:
-   • 👤 Buyer — type new name
    • 💰 Price — type new price
    • 📦 Status — pick paid/pending
    • 📝 Notes — type new notes
@@ -219,7 +193,7 @@ Lets you change buyer, price, payment status, or notes on existing sales.
 <b>Account IDs</b> are plain numbers: 1, 2, 3
 
 <b>Works with incomplete sales:</b>
-If an account was marked as sold directly (via /marksold) without buyer/price info, /editsale will create a draft sale record so you can fill in the details.
+If an account was marked as sold directly (via /marksold) without price info, /editsale will create a draft sale record so you can fill in the details.
 
 <b>Notes:</b>
 - Accepts multiple IDs: /editsale → Account ID → 1,2,3
@@ -257,7 +231,6 @@ Type your search
 🔑 Password — find by password
 📂 Category — pick a category
 📊 Status — pick 🟢/🔴/🟡
-👤 Buyer — find by buyer name
 📝 Notes — find in notes
 🔍 General — searches everything
 🔢 By ID — type account numbers""",
@@ -344,7 +317,7 @@ Then type:
     "preview": """<b>📂 /preview — Show to Buyer</b>
 
 <b>What it does:</b>
-Pulls accounts to show a buyer.
+Pulls accounts to show from a category.
 
 <b>How to use:</b>
 1. Type /preview
@@ -393,23 +366,6 @@ Shows:
 🟡 Waiting for money count
 Per category and total""",
 
-    "buyers": """<b>👥 /buyers — List Buyers</b>
-
-<b>What it does:</b>
-Shows all buyers and how much they spent.
-
-<b>How to use:</b>
-Type /buyers""",
-
-    "buyer": """<b>👤 /buyer — Buyer History</b>
-
-<b>What it does:</b>
-Shows one buyer's purchase history.
-
-<b>How to use:</b>
-Type /buyer John
-(replace John with buyer name)""",
-
     "report": """<b>📊 /report — Money Report</b>
 
 <b>What it does:</b>
@@ -433,7 +389,6 @@ Shows revenue stats and generates charts.
 📈 Revenue over time
 📂 Revenue by category
 💳 Payment status breakdown
-🏆 Top buyers
 👨‍💼 Top sellers (admin only)""",
 
     "addseller": """<b>👤 /addseller — Add Team Member</b>

@@ -3,11 +3,12 @@ from telegram.ext import ContextTypes
 from core.permissions import require_seller, require_admin
 from core.state import state
 from core.format import esc, _d, _truncate, code_id, code_username
+import config
 from core.keyboards import confirm_keyboard, category_keyboard
 from core.filters import (
     filter_page_keyboard, apply_list_filters, count_from_filter,
     fmt_account_list_page, parse_filter_state, build_filter_state,
-    parse_id_list, buyer_keyboard, payment_status_keyboard,
+    parse_id_list, payment_status_keyboard,
     fmt_account_list_line, category_keyboard_with_all, PAGE_SIZE,
 )
 from database import (
@@ -22,6 +23,7 @@ from telegram.error import BadRequest
 
 async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str, user_id: int) -> bool:
     query = update.callback_query
+    await query.answer()
 
     if data == "menu:list":
         if not await require_seller(update):
@@ -108,9 +110,11 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             return True
         state.set(user_id, "list_page", page)
         filter_str = state.get(user_id, "list_filter")
-        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE)
+        _, total = apply_list_filters(filter_str, limit=0, offset=0)
         total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
         page = max(1, min(page, total_pages))
+        state.set(user_id, "list_page", page)
+        accounts, _ = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE)
         text = fmt_account_list_page(accounts, page, total_pages, title="Accounts")
         kb = filter_page_keyboard(
             "listfilter", page, total_pages,
@@ -192,9 +196,11 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             return True
         state.set(user_id, "delete_page", page)
         filter_str = state.get(user_id, "delete_filter")
-        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE)
+        _, total = apply_list_filters(filter_str, limit=0, offset=0)
         total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
         page = max(1, min(page, total_pages))
+        state.set(user_id, "delete_page", page)
+        accounts, _ = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE)
         text = fmt_account_list_page(accounts, page, total_pages, title="Delete Accounts")
         kb = filter_page_keyboard(
             "delfilter", page, total_pages,
@@ -236,7 +242,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         state.pop(user_id, "delete_confirm", None)
         success = delete_account(account_id)
         if success:
-            await query.edit_message_text(f"✅ Account {code_id(account_id)} deleted.")
+            await query.edit_message_text(f"✅ Account {code_id(account_id)} deleted.", parse_mode="HTML")
         else:
             await query.edit_message_text("❌ Failed to delete account.")
         return True
@@ -264,8 +270,8 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         text += f"🟢 Available: {available}\n"
         text += f"🔴 Sold: {sold}\n"
         text += f"🟡 Pending Payment: {pending}\n"
-        text += f"💰 Total revenue: ₹{summary.get('total_revenue', 0):.0f}\n"
-        text += f"💳 Pending: ₹{summary.get('pending_amount', 0):.0f}\n\n"
+        text += f"💰 Total revenue: {config.CURRENCY}{summary.get('total_revenue', 0):.0f}\n"
+        text += f"💳 Pending: {config.CURRENCY}{summary.get('pending_amount', 0):.0f}\n\n"
         text += "<b>📂 By Category:</b>\n"
         for cat in cats:
             cat_avail = count_accounts(category_id=cat["id"], status="available")
@@ -350,9 +356,11 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             return True
         state.set(user_id, "inv_page", page)
         filter_str = state.get(user_id, "inv_filter")
-        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE)
+        _, total = apply_list_filters(filter_str, limit=0, offset=0)
         total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
         page = max(1, min(page, total_pages))
+        state.set(user_id, "inv_page", page)
+        accounts, _ = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE)
         text = fmt_account_list_page(accounts, page, total_pages, title="Inventory")
         kb = filter_page_keyboard(
             "invfilter", page, total_pages,
@@ -379,7 +387,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         success = set_account_status(account_id, new_status)
         if success:
             emoji = {"available": "🟢", "sold": "🔴", "pending_payment": "🟡"}.get(new_status, "⚪")
-            await query.edit_message_text(f"✅ Account {code_id(account_id)} marked as {emoji} {new_status}.")
+            await query.edit_message_text(f"✅ Account {code_id(account_id)} marked as {emoji} {new_status}.", parse_mode="HTML")
         else:
             await query.edit_message_text("❌ Failed to update status.")
         return True

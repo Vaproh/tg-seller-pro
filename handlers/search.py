@@ -74,7 +74,6 @@ async def handle_search_type(update: Update, context: ContextTypes.DEFAULT_TYPE,
     labels = {
         "username": "Reddit username",
         "password": "password",
-        "buyer": "buyer name",
         "tag": "tag",
         "notes": "notes keyword",
         "general": "search term",
@@ -112,8 +111,6 @@ async def handle_search_value(update: Update, context: ContextTypes.DEFAULT_TYPE
         kwargs["username"] = value
     elif search_type == "password":
         kwargs["password"] = value
-    elif search_type == "buyer":
-        kwargs["buyer"] = value
     elif search_type == "tag":
         kwargs["tag"] = value
     elif search_type == "notes":
@@ -185,7 +182,6 @@ def _search_type_keyboard():
             InlineKeyboardButton("📊 Status", callback_data="search:status"),
         ],
         [
-            InlineKeyboardButton("👤 Buyer", callback_data="search:buyer"),
             InlineKeyboardButton("🏷️ Tag", callback_data="search:tag"),
         ],
         [

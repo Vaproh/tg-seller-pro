@@ -59,6 +59,7 @@ async def _csv_show_preview(update, context, user_id, query):
 
 async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str, user_id: int) -> bool:
     query = update.callback_query
+    await query.answer()
 
     if data.startswith("csvcat:"):
         cat_id_str = data.split(":", 1)[1]

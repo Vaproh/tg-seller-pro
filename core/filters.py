@@ -153,21 +153,6 @@ def category_keyboard_with_all(callback_prefix):
     return InlineKeyboardMarkup(buttons) if buttons else None
 
 
-def buyer_keyboard(buyer_names, callback_prefix="buypick"):
-    buttons = []
-    for name in buyer_names[:10]:
-        buttons.append([
-            InlineKeyboardButton(
-                f"👤 {esc(name)}",
-                callback_data=f"{callback_prefix}:{name}",
-            )
-        ])
-    buttons.append([
-        InlineKeyboardButton("✏️ Type new buyer", callback_data=f"{callback_prefix}:new")
-    ])
-    return InlineKeyboardMarkup(buttons)
-
-
 def payment_status_keyboard(prefix="paystatus"):
     return InlineKeyboardMarkup([
         [

@@ -91,7 +91,7 @@ async def _editsale_process_ids_text(update, context, text):
                 else:
                     invalid_ids.append(id_str)
     if not valid_sales:
-        await update.message.reply_text(f"⚠️ Not found: {', '.join(code(i) for i in invalid_ids)}")
+        await update.message.reply_text(f"⚠️ Not found: {', '.join(code(i) for i in invalid_ids)}", parse_mode="HTML")
         return
     state.set(user_id, "editsale_ids", [s["id"] for s in valid_sales])
     state.set(user_id, "editsale_pending", {})
@@ -115,7 +115,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         state.set(user_id, "add_username", text)
         state.set(user_id, "add_stage", "password")
-        await update.message.reply_text(f"✅ Username: {code(text)}\n🔑 Send the password:")
+        await update.message.reply_text(f"✅ Username: {code(text)}\n🔑 Send the password:", parse_mode="HTML")
         return
 
     if stage == "password":
@@ -138,7 +138,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         state.set(user_id, "add_email", text)
         state.set(user_id, "add_stage", "email_password")
-        await update.message.reply_text(f"✅ Email: {code(text)}\n📧 Send email password (or /skip):")
+        await update.message.reply_text(f"✅ Email: {code(text)}\n📧 Send email password (or /skip):", parse_mode="HTML")
         return
 
     if stage == "email_password":
@@ -202,7 +202,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             state.pop(user_id, "bulk_lines")
             state.pop(user_id, "bulk_category")
             msg = f"📥 Bulk import: {result['added']} added, {result['skipped']} skipped in {code(cat_name)}"
-            await update.message.reply_text(msg)
+            await update.message.reply_text(msg, parse_mode="HTML")
             await notify_admin(context, fmt_bulk_import(result["added"], result["skipped"], cat_name))
             return
         current = state.get(user_id, "bulk_lines", "")
@@ -277,14 +277,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Sell flow ──────────────────────────────────────────
     sell_stage = state.get(user_id, "sell_stage")
-    if sell_stage == "buyer":
-        if len(text) > config.MAX_BUYER_LEN:
-            await update.message.reply_text(f"⚠️ Buyer name too long (max {config.MAX_BUYER_LEN} chars).")
-            return
-        state.set(user_id, "sell_buyer", text)
-        state.set(user_id, "sell_stage", "price")
-        await update.message.reply_text(f"👤 Buyer: {esc(text)}\n\n💰 Enter price (₹):")
-        return
 
     # ── Edit sale flow ─────────────────────────────────────
     editsale_stage = state.get(user_id, "editsale_stage")
@@ -305,11 +297,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             key, _, value = line.partition(" ")
             key = key.lower().strip()
             value = value.strip()
-            if key in ("buyer", "buyer_name"):
-                fields["buyer_name"] = value
-            elif key == "price":
+            if key == "price":
                 try:
-                    fields["price"] = float(value.replace("₹", "").replace(",", ""))
+                    fields["price"] = float(value.replace(config.CURRENCY, "").replace(",", ""))
                 except ValueError:
                     pass
             elif key in ("status", "payment_status", "paystatus"):
@@ -337,22 +327,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parts.append(f"✏️ Updated {detail}: {field_names}")
         if failed:
             parts.append(f"⚠️ Failed: {', '.join(code(i) for i in failed)}")
-        await update.message.reply_text("\n".join(parts))
+        await update.message.reply_text("\n".join(parts), parse_mode="HTML")
         return
 
     editsale_field = state.get(user_id, "editsale_field")
-    if editsale_field in ("buyer", "price", "notes", "status"):
+    if editsale_field in ("price", "notes", "status"):
         sale_ids = state.get(user_id, "editsale_ids", [])
         pending = state.get(user_id, "editsale_pending", {})
-        if editsale_field == "buyer":
-            if len(text) > config.MAX_BUYER_LEN:
-                await update.message.reply_text(f"⚠️ Buyer name too long (max {config.MAX_BUYER_LEN} chars).")
-                return
-            value = text
-            field_key = "buyer_name"
-        elif editsale_field == "price":
+        if editsale_field == "price":
             try:
-                value = float(text.replace("₹", "").replace(",", ""))
+                value = float(text.replace(config.CURRENCY, "").replace(",", ""))
             except ValueError:
                 await update.message.reply_text("⚠️ Enter a valid price:")
                 return
@@ -389,7 +373,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if sell_stage == "price":
         try:
-            price = float(text.replace("₹", "").replace(",", ""))
+            price = float(text.replace(config.CURRENCY, "").replace(",", ""))
         except ValueError:
             await update.message.reply_text("⚠️ Enter a valid price:")
             return
@@ -411,28 +395,20 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except ValueError:
             await update.message.reply_text("⚠️ Enter a valid number:")
             return
-        available = count_accounts(status="available")
+        cat_id = state.get(user_id, "sell_category")
+        available = count_accounts(status="available", category_id=cat_id)
         if num < 1:
             await update.message.reply_text("⚠️ Must be at least 1:")
             return
         if num > available:
             await update.message.reply_text(f"⚠️ Only {available} available. Enter a smaller number:")
             return
-        account_ids = get_available_account_ids(num)
+        account_ids = get_available_account_ids(num, category_id=cat_id)
         state.set(user_id, "sell_selected", account_ids)
-        state.set(user_id, "sell_mode", "bulk")
-        state.set(user_id, "sell_stage", "buyer")
-        from database import get_buyer_names
-        from core.filters import buyer_keyboard
-        buyer_names = get_buyer_names()
-        if buyer_names:
-            kb = buyer_keyboard(buyer_names, "buypick")
-            await update.message.reply_text(
-                f"✅ Selected {num} accounts.\n\n👤 Select buyer or type a new one:",
-                reply_markup=kb,
-            )
-        else:
-            await update.message.reply_text(f"✅ Selected {num} accounts.\n\n👤 Enter buyer name:")
+        state.set(user_id, "sell_stage", "price")
+        await update.message.reply_text(
+            f"✅ Selected {num} accounts.\n\n💰 Enter price ({config.CURRENCY}):",
+        )
         return
 
 

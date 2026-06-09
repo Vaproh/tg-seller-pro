@@ -8,10 +8,12 @@ from core.filters import PAGE_SIZE
 from database import get_sale_by_id, count_sales, get_sales, get_seller_by_user_id, mark_payment, void_sale
 from database.sales import update_sale, get_sales_summary
 from utils.notifications import notify_admin, fmt_void_notification
+import config
 
 
 async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str, user_id: int) -> bool:
     query = update.callback_query
+    await query.answer()
 
     if data == "menu:sales":
         if not await require_seller(update):
@@ -100,9 +102,9 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         mark_payment(sale_id, new_status)
         label = "paid ✅" if new_status == "paid" else "🟡 pending"
         sale_code = _d(sale).get("sale_code", f"#{sale_id}")
-        await query.edit_message_text(f"✅ {code(sale_code)} → {label}.")
+        await query.edit_message_text(f"✅ {code(sale_code)} → {label}.", parse_mode="HTML")
         if new_status == "paid":
-            await notify_admin(context, f"✅ Payment received! {code(sale_code)} — ₹{_d(sale).get('price', 0):.0f} from {_d(sale).get('buyer_name')}")
+            await notify_admin(context, f"✅ Payment received! {code(sale_code)} — {config.CURRENCY}{_d(sale).get('price', 0):.0f}")
         return True
 
     if data.startswith("marksold:"):
@@ -123,7 +125,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             return True
         mark_payment(sale_id, "paid")
         sale_code = sd.get("sale_code", f"#{sale_id}")
-        await query.edit_message_text(f"✅ {code(sale_code)} → 🔴 sold.")
+        await query.edit_message_text(f"✅ {code(sale_code)} → 🔴 sold.", parse_mode="HTML")
         return True
 
     if data.startswith("marksaleunsold:"):
@@ -190,7 +192,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             return True
         mark_payment(sale_id, "pending")
         sale_code = sd.get("sale_code", f"#{sale_id}")
-        await query.edit_message_text(f"✅ {code(sale_code)} → 🟡 pending payment.")
+        await query.edit_message_text(f"✅ {code(sale_code)} → 🟡 pending payment.", parse_mode="HTML")
         return True
 
     if data.startswith("voidconfirm:"):
@@ -205,7 +207,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         sale_code = _d(sale).get("sale_code", f"#{sale_id}") if sale else f"#{sale_id}"
         success = void_sale(sale_id)
         if success:
-            await query.edit_message_text(f"✅ {code(sale_code)} voided. Account returned to available stock.")
+            await query.edit_message_text(f"✅ {code(sale_code)} voided. Account returned to available stock.", parse_mode="HTML")
             await notify_admin(context, fmt_void_notification(sale_code))
         else:
             await query.edit_message_text("❌ Failed to void sale.")
@@ -231,8 +233,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         field = data.split(":")[-1]
         state.set(user_id, "editsale_field", field)
         prompts = {
-            "buyer": "👤 Enter new buyer name:",
-            "price": "💰 Enter new price (₹):",
+            "price": f"💰 Enter new price ({config.CURRENCY}):",
             "status": None,
             "notes": "📝 Enter new notes (or /clear to remove):",
         }
@@ -273,7 +274,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         field = state.get(user_id, "editsale_field")
         sale_ids = state.get(user_id, "editsale_ids", [])
         pending = state.get(user_id, "editsale_pending", {})
-        field_key = "buyer_name" if field == "buyer" else ("payment_status" if field == "status" else field)
+        field_key = "payment_status" if field == "status" else field
         for sid in sale_ids:
             if sid not in pending:
                 pending[sid] = {}
@@ -321,7 +322,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
                 parts.append(f"✏️ Updated {code(sale_code)}: {', '.join(field_names)}")
         if failed:
             parts.append(f"⚠️ Failed: {', '.join(code(i) for i in failed)}")
-        await query.edit_message_text("\n".join(parts))
+        await query.edit_message_text("\n".join(parts), parse_mode="HTML")
         return True
 
     if data == "editsale:cancel":

@@ -93,7 +93,6 @@ def fmt_sale_block(sale):
         lines.append(f"│ 📧 Email: {code(email)}")
     lines.append(f"│ 🔗 Profile: {code(reddit_url(username))}")
     lines.append(f"│")
-    lines.append(f"│ 👤 Buyer: {code(s.get('buyer_name'))}")
     lines.append(f"│ 💰 Price: {config.CURRENCY}{s.get('price', 0):.0f}")
     lines.append(f"│ 💳 Status: {ps_emoji} {esc(ps)}")
     lines.append(f"│ 📅 Sold: {esc(str(s.get('sold_at', ''))[:10])}")

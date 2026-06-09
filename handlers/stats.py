@@ -7,10 +7,10 @@ from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from database import get_seller_by_user_id
 from database.sales import (
     get_sales_summary, get_revenue_by_day, get_sales_by_category,
-    get_top_buyers, get_top_sellers, get_payment_breakdown,
+    get_top_sellers, get_payment_breakdown,
 )
 from utils.charts import (
-    revenue_chart, category_pie, top_buyers_bar,
+    revenue_chart, category_pie,
     payment_donut, top_sellers_bar,
 )
 import config
@@ -96,9 +96,7 @@ async def stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, dat
 
     if action == "charts":
         period = state.get(user_id, "stats_period", "all")
-        period_map = {"today": "today", "week": "week", "month": "month", "all": None}
         days_map = {"today": 1, "week": 7, "month": 30, "all": 90}
-        p = period_map.get(period)
         days = days_map.get(period, 90)
 
         await query.edit_message_text("📊 Generating charts...")
@@ -120,11 +118,6 @@ async def stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, dat
         if buf:
             charts.append(buf)
 
-        rows = get_top_buyers(limit=10, seller_id=seller_id)
-        buf = top_buyers_bar(rows)
-        if buf:
-            charts.append(buf)
-
         if role == "admin":
             rows = get_top_sellers(limit=10)
             buf = top_sellers_bar(rows)
@@ -135,7 +128,7 @@ async def stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, dat
             await query.edit_message_text("📭 No data to generate charts.")
             return True
 
-        labels = ["📈 Revenue Over Time", "📂 By Category", "💳 Payment Status", "🏆 Top Buyers", "👨‍💼 Top Sellers"]
+        labels = ["📈 Revenue Over Time", "📂 By Category", "💳 Payment Status", "👨‍💼 Top Sellers"]
         for i, buf in enumerate(charts):
             buf.seek(0)
             try:

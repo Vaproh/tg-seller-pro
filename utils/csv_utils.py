@@ -53,13 +53,13 @@ def export_with_sales_csv(sales_data):
     writer = csv.writer(output)
     writer.writerow([
         "sale_id", "account_id", "username", "password",
-        "buyer", "price", "payment_status", "tags",
+        "price", "payment_status", "tags",
         "seller", "category", "sold_at"
     ])
     for s in sales_data:
         writer.writerow([
             s["id"], s["account_id"], s["username"], s["password"],
-            s["buyer_name"], s["price"], s["payment_status"],
+            s["price"], s["payment_status"],
             s.get("tags", ""), s.get("seller_name", ""),
             s.get("category_name", ""), s["sold_at"],
         ])

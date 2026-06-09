@@ -6,6 +6,7 @@ from core.keyboards import main_menu_keyboard
 
 async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str, user_id: int) -> bool:
     query = update.callback_query
+    await query.answer()
 
     if data == "menu:back":
         role = get_user_role(user_id)

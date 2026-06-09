@@ -1,4 +1,3 @@
-import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_admin, require_seller
@@ -18,7 +17,6 @@ from utils.parsers import parse_bulk_lines
 from utils.notifications import notify_admin, fmt_bulk_import
 import config
 
-logger = logging.getLogger(__name__)
 
 
 async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -75,6 +73,7 @@ async def delete_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state.set(update.effective_user.id, "delete_confirm", account_id)
         await update.message.reply_text(
             f"⚠️ Delete account {code_id(account_id)} ({code_username(_d(account)['username'])})?",
+            parse_mode="HTML",
             reply_markup=confirm_keyboard(f"delconfirm:{account_id}", "delcancel"),
         )
         return

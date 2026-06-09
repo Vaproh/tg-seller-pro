@@ -16,7 +16,7 @@ def _resolve_sale_id(conn, sale_id):
     return row["id"] if row else None
 
 
-def sell_account(account_id, seller_id, buyer, price, payment_status="pending", notes=None):
+def sell_account(account_id, seller_id, price, payment_status="pending", notes=None):
     conn = connect()
     try:
         account = conn.execute(
@@ -30,7 +30,7 @@ def sell_account(account_id, seller_id, buyer, price, payment_status="pending", 
         cursor = conn.execute(
             """INSERT INTO sales (account_id, seller_id, buyer_name, price, payment_status, notes, sale_code)
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (account_id, seller_id, buyer, price, payment_status, notes, sale_code),
+            (account_id, seller_id, "Unknown", price, payment_status, notes, sale_code),
         )
         new_status = "pending_payment" if payment_status == "pending" else "sold"
         conn.execute(
@@ -45,7 +45,7 @@ def sell_account(account_id, seller_id, buyer, price, payment_status="pending", 
         conn.close()
 
 
-def bulk_sell_accounts(ids, seller_id, buyer, price_each, payment_status="pending", notes=None):
+def bulk_sell_accounts(ids, seller_id, price_each, payment_status="pending", notes=None):
     added = 0
     skipped = 0
     conn = connect()
@@ -60,7 +60,7 @@ def bulk_sell_accounts(ids, seller_id, buyer, price_each, payment_status="pendin
                 conn.execute(
                     """INSERT INTO sales (account_id, seller_id, buyer_name, price, payment_status, notes, sale_code)
                        VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                    (aid, seller_id, buyer, price_each, payment_status, notes, sale_code),
+                    (aid, seller_id, "Unknown", price_each, payment_status, notes, sale_code),
                 )
                 new_status = "pending_payment" if payment_status == "pending" else "sold"
                 conn.execute(
@@ -109,7 +109,7 @@ def mark_payment(sale_id, status):
         conn.close()
 
 
-def get_sales(limit=20, offset=0, seller_id=None, buyer=None, status=None, tag=None):
+def get_sales(limit=20, offset=0, seller_id=None, status=None, tag=None):
     conn = connect()
     try:
         query = """
@@ -125,9 +125,6 @@ def get_sales(limit=20, offset=0, seller_id=None, buyer=None, status=None, tag=N
         if seller_id is not None:
             query += " AND s.seller_id = ?"
             params.append(seller_id)
-        if buyer:
-            query += " AND LOWER(s.buyer_name) = LOWER(?)"
-            params.append(buyer)
         if status:
             query += " AND s.payment_status = ?"
             params.append(status)
@@ -180,60 +177,6 @@ def get_sale_by_id(sale_id):
         conn.close()
 
 
-def get_buyers(seller_id=None):
-    conn = connect()
-    try:
-        query = """
-            SELECT s.buyer_name,
-                   COUNT(*) as total_sales,
-                   SUM(s.price) as total_spent,
-                   SUM(CASE WHEN s.payment_status = 'pending' THEN s.price ELSE 0 END) as pending_amount
-            FROM sales s
-            WHERE 1=1
-        """
-        params = []
-        if seller_id is not None:
-            query += " AND s.seller_id = ?"
-            params.append(seller_id)
-        query += " GROUP BY LOWER(s.buyer_name) ORDER BY total_spent DESC"
-        return conn.execute(query, params).fetchall()
-    finally:
-        conn.close()
-
-
-def get_buyer_names():
-    conn = connect()
-    try:
-        rows = conn.execute(
-            "SELECT DISTINCT buyer_name FROM sales ORDER BY buyer_name"
-        ).fetchall()
-        return [r["buyer_name"] for r in rows]
-    finally:
-        conn.close()
-
-
-def get_buyer_sales(buyer, seller_id=None, limit=20):
-    conn = connect()
-    try:
-        query = """
-            SELECT s.*, a.username, c.name as category_name, sl.name as seller_name
-            FROM sales s
-            JOIN accounts a ON a.id = s.account_id
-            JOIN categories c ON c.id = a.category_id
-            LEFT JOIN sellers sl ON sl.id = s.seller_id
-            WHERE LOWER(s.buyer_name) = LOWER(?)
-        """
-        params = [buyer]
-        if seller_id is not None:
-            query += " AND s.seller_id = ?"
-            params.append(seller_id)
-        query += " ORDER BY s.id DESC LIMIT ?"
-        params.append(limit)
-        return conn.execute(query, params).fetchall()
-    finally:
-        conn.close()
-
-
 def get_sales_summary(seller_id=None, period=None):
     conn = connect()
     try:
@@ -262,9 +205,12 @@ def get_sales_summary(seller_id=None, period=None):
         conn.close()
 
 
+_UNSET = object()
+
+
 def update_sale(sale_id, **fields):
-    allowed = {"buyer_name", "price", "payment_status", "notes"}
-    updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
+    allowed = {"price", "payment_status", "notes"}
+    updates = {k: v for k, v in fields.items() if k in allowed and v is not _UNSET}
     if not updates:
         return False
     conn = connect()
@@ -373,25 +319,6 @@ def get_sales_by_category(seller_id=None):
             query += " AND s.seller_id = ?"
             params.append(seller_id)
         query += " GROUP BY c.name ORDER BY revenue DESC"
-        return conn.execute(query, params).fetchall()
-    finally:
-        conn.close()
-
-
-def get_top_buyers(limit=10, seller_id=None):
-    conn = connect()
-    try:
-        query = """
-            SELECT s.buyer_name, COUNT(*) as total_sales, SUM(s.price) as total_spent
-            FROM sales s
-            WHERE 1=1
-        """
-        params = []
-        if seller_id is not None:
-            query += " AND s.seller_id = ?"
-            params.append(seller_id)
-        query += " GROUP BY LOWER(s.buyer_name) ORDER BY total_spent DESC LIMIT ?"
-        params.append(limit)
         return conn.execute(query, params).fetchall()
     finally:
         conn.close()

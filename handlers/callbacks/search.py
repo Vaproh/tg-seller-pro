@@ -5,6 +5,8 @@ from handlers.search import handle_search_type, handle_search_category, handle_s
 
 
 async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str, user_id: int) -> bool:
+    query = update.callback_query
+    await query.answer()
 
     if data.startswith("search:"):
         if not await require_seller(update):

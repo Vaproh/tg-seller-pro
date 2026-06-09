@@ -17,7 +17,7 @@ def fmt_sale_notification(sale):
     sale_code = sale.get("sale_code", f"#{sale.get('id', '?')}")
     return (
         f"💰 New sale! {code(sale_code)} — "
-        f"{code(sale.get('buyer_name', '—'))} — {config.CURRENCY}{sale.get('price', 0):.0f} — "
+        f"{config.CURRENCY}{sale.get('price', 0):.0f} — "
         f"by {sale.get('seller_name', '—')}"
     )
 
@@ -26,7 +26,7 @@ def fmt_payment_notification(sale):
     sale_code = sale.get("sale_code", f"#{sale.get('id', '?')}")
     return (
         f"✅ Payment received! {code(sale_code)} — "
-        f"{config.CURRENCY}{sale.get('price', 0):.0f} from {code(sale.get('buyer_name', '—'))}"
+        f"{config.CURRENCY}{sale.get('price', 0):.0f}"
     )
 
 
@@ -34,7 +34,7 @@ def fmt_high_value_notification(sale):
     sale_code = sale.get("sale_code", f"#{sale.get('id', '?')}")
     return (
         f"🔥 High-value sale! {code(sale_code)} — "
-        f"{config.CURRENCY}{sale.get('price', 0):.0f} from {code(sale.get('buyer_name', '—'))} — "
+        f"{config.CURRENCY}{sale.get('price', 0):.0f} — "
         f"by {sale.get('seller_name', '—')}"
     )
 

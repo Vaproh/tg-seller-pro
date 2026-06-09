@@ -18,7 +18,6 @@ MAX_USERNAME_LEN = 64
 MAX_PASSWORD_LEN = 128
 MAX_EMAIL_LEN = 128
 MAX_NOTES_LEN = 512
-MAX_BUYER_LEN = 64
 
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN is missing in .env")

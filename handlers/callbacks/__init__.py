@@ -16,7 +16,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
     user_id = query.from_user.id
-    await query.answer()
 
     for handler in (
         handle_misc,

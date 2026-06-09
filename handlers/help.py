@@ -6,7 +6,7 @@ from core.help_content import HELP_MAIN_ADMIN, HELP_MAIN_SELLER, HELP_TOPICS
 
 
 TOPIC_EMOJIS = {
-    "sell": "💰", "bulksell": "💰", "sales": "📈", "sale": "🧾",
+    "sell": "💰", "sales": "📈", "sale": "🧾",
     "markpaid": "💳", "marksold": "🔴", "markunsold": "🟢",
     "markpendingpayment": "🟡", "voidsale": "♻️",
     "list": "📋", "search": "🔎", "getid": "🔍",
@@ -14,14 +14,14 @@ TOPIC_EMOJIS = {
     "delete": "🗑️", "bulkdelete": "🗑️",
     "preview": "📂", "categories": "📂", "addcategory": "➕",
     "deletecategory": "🗑️",
-    "inventory": "📦", "buyers": "👥", "buyer": "👤",
+    "inventory": "📦",
     "report": "📊", "addseller": "👤", "removeseller": "🚫",
     "listsellers": "👥", "export": "📤", "backup": "💾",
     "ping": "🏓", "status": "📊", "filter": "🔍", "settings": "⚙️",
 }
 
 TOPIC_NAMES = {
-    "sell": "Sell", "bulksell": "Bulk Sell", "sales": "Sales", "sale": "Sale",
+    "sell": "Sell", "sales": "Sales", "sale": "Sale",
     "markpaid": "Mark Paid", "marksold": "Mark Sold", "markunsold": "Mark Unsold",
     "markpendingpayment": "Mark Pending", "voidsale": "Void Sale",
     "list": "List", "search": "Search", "getid": "Get ID",
@@ -29,14 +29,14 @@ TOPIC_NAMES = {
     "delete": "Delete", "bulkdelete": "Bulk Delete",
     "preview": "Preview", "categories": "Categories", "addcategory": "Add Category",
     "deletecategory": "Delete Category",
-    "inventory": "Inventory", "buyers": "Buyers", "buyer": "Buyer",
+    "inventory": "Inventory",
     "report": "Report", "addseller": "Add Seller", "removeseller": "Remove Seller",
     "listsellers": "List Sellers", "export": "Export", "backup": "Backup",
     "ping": "Ping", "status": "Status", "filter": "Filter", "settings": "Settings",
 }
 
 COMMAND_TO_TOPIC = {
-    "sell": "sell", "bulksell": "bulksell", "sales": "sales", "sale": "sale",
+    "sell": "sell", "sales": "sales", "sale": "sale",
     "markpaid": "markpaid", "marksold": "marksold", "markunsold": "markunsold",
     "markpendingpayment": "markpendingpayment", "voidsale": "voidsale",
     "list": "list", "search": "search", "getid": "getid",
@@ -44,7 +44,7 @@ COMMAND_TO_TOPIC = {
     "delete": "delete", "bulkdelete": "bulkdelete",
     "preview": "preview", "categories": "categories", "addcategory": "addcategory",
     "deletecategory": "deletecategory",
-    "inventory": "inventory", "buyers": "buyers", "buyer": "buyer",
+    "inventory": "inventory",
     "report": "report", "addseller": "addseller", "removeseller": "removeseller",
     "listsellers": "listsellers", "export": "export", "backup": "backup",
     "ping": "ping",
@@ -54,9 +54,9 @@ COMMAND_TO_TOPIC = {
 def _topics_keyboard():
     buttons = []
     row = []
-    topics = ["sell", "bulksell", "list", "search", "add", "delete",
+    topics = ["sell", "list", "search", "add", "delete",
               "status", "filter", "preview", "inventory",
-              "sales", "buyers", "categories", "settings"]
+              "sales", "categories", "settings"]
     for topic in topics:
         if topic not in HELP_TOPICS:
             continue

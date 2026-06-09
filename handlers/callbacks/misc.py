@@ -8,11 +8,13 @@ from core.format import esc, code, _truncate
 from core.keyboards import settings_keyboard, report_period_keyboard, category_keyboard
 from database import get_category_name
 from handlers.preview import handle_preview_category
+import config
 from handlers.reports import handle_report_period
 
 
 async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str, user_id: int) -> bool:
     query = update.callback_query
+    await query.answer()
 
     if data == "noop":
         return True
@@ -58,7 +60,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             status = "🟢" if s["active"] else "🔴"
             text += (
                 f"{status} {esc(s['name'])} (ID: {code(s['user_id'])}) — "
-                f"{s['sale_count']} sales, ₹{s['total_earnings']:.0f}\n"
+                f"{s['sale_count']} sales, {config.CURRENCY}{s['total_earnings']:.0f}\n"
             )
         await query.edit_message_text(text, parse_mode="HTML")
         return True

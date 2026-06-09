@@ -28,40 +28,19 @@ async def sell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not seller:
         await update.message.reply_text("⚠️ You are not registered as a seller.")
         return
+    state.set(user_id, "sell_category", None)
     kb = category_keyboard("sellcat", include_all=True)
     if not kb:
         state.set(user_id, "sell_category", None)
         kb2 = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("👆 Pick account", callback_data="sellmode:select"),
-                InlineKeyboardButton("🎲 Pick any", callback_data="sellmode:any"),
+                InlineKeyboardButton("👆 Pick accounts", callback_data="sellmode:selectmany"),
+                InlineKeyboardButton("🔢 Enter number", callback_data="sellmode:number"),
             ],
         ])
-        await update.message.reply_text("💰 Sell an account:", reply_markup=kb2)
+        await update.message.reply_text("💰 Sell accounts:", reply_markup=kb2)
     else:
         await update.message.reply_text("📂 Select category to sell from:", reply_markup=kb)
-
-
-async def bulksell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await require_seller(update):
-        return
-    user_id = update.effective_user.id
-    seller = get_seller_by_user_id(user_id)
-    if not seller:
-        await update.message.reply_text("⚠️ You are not registered as a seller.")
-        return
-    kb = category_keyboard("bulksellcat", include_all=True)
-    if not kb:
-        state.set(user_id, "sell_category", None)
-        kb2 = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("👆 Select accounts", callback_data="bulksellmode:select"),
-                InlineKeyboardButton("🔢 Enter number", callback_data="bulksellmode:number"),
-            ],
-        ])
-        await update.message.reply_text("💰 How would you like to bulk sell?", reply_markup=kb2)
-    else:
-        await update.message.reply_text("📂 Select category to bulk sell from:", reply_markup=kb)
 
 
 async def sales_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -126,7 +105,7 @@ async def markpaid_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             mark_payment(sd.get("id"), new_status)
             label = "paid" if new_status == "paid" else "🟡 pending"
             results.append(f"✅ {code(sale_code)} → {label}")
-        await update.message.reply_text("\n".join(results))
+        await update.message.reply_text("\n".join(results), parse_mode="HTML")
         return
     pending = get_sales(limit=50, seller_id=seller_id, status="pending")
     if not pending:
@@ -138,7 +117,7 @@ async def markpaid_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
         buttons.append([
             InlineKeyboardButton(
-                f"{esc(sale_code)} | {esc(sd.get('buyer_name'))} | ₹{sd.get('price', 0):.0f}",
+                f"{esc(sale_code)} | {config.CURRENCY}{sd.get('price', 0):.0f}",
                 callback_data=f"markpaid:{sd.get('id')}",
             )
         ])
@@ -169,7 +148,9 @@ async def voidsale_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts.append(f"♻️ Voided: {', '.join(code(s) for s in valid)}")
     if invalid:
         parts.append(f"⚠️ Not found: {', '.join(code(i) for i in invalid)}")
-    await update.message.reply_text("\n".join(parts))
+    if not parts:
+        parts.append("⚠️ No sale IDs provided.")
+    await update.message.reply_text("\n".join(parts), parse_mode="HTML")
 
 
 async def marksold_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -192,7 +173,7 @@ async def marksold_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
             mark_payment(sd.get("id"), "paid")
             results.append(f"✅ {code(sale_code)} → 🔴 sold")
-        await update.message.reply_text("\n".join(results))
+        await update.message.reply_text("\n".join(results), parse_mode="HTML")
         return
     pending = get_sales(limit=50, seller_id=seller_id, status="pending")
     if not pending:
@@ -204,7 +185,7 @@ async def marksold_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
         buttons.append([
             InlineKeyboardButton(
-                f"{esc(sale_code)} | {esc(sd.get('buyer_name'))} | ₹{sd.get('price', 0):.0f}",
+                f"{esc(sale_code)} | {config.CURRENCY}{sd.get('price', 0):.0f}",
                 callback_data=f"marksold:{sd.get('id')}",
             )
         ])
@@ -232,7 +213,7 @@ async def markunsold_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
             void_sale(sd.get("id"))
             results.append(f"✅ {code(sale_code)} → 🟢 available")
-        await update.message.reply_text("\n".join(results))
+        await update.message.reply_text("\n".join(results), parse_mode="HTML")
         return
     sold = get_sales(limit=50, seller_id=seller_id, status="paid")
     if not sold:
@@ -244,7 +225,7 @@ async def markunsold_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
         buttons.append([
             InlineKeyboardButton(
-                f"{esc(sale_code)} | {esc(sd.get('buyer_name'))} | ₹{sd.get('price', 0):.0f}",
+                f"{esc(sale_code)} | {config.CURRENCY}{sd.get('price', 0):.0f}",
                 callback_data=f"marksaleunsold:{sd.get('id')}",
             )
         ])
@@ -272,7 +253,7 @@ async def markpendingpayment_cmd(update: Update, context: ContextTypes.DEFAULT_T
             sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
             mark_payment(sd.get("id"), "pending")
             results.append(f"✅ {code(sale_code)} → 🟡 pending payment")
-        await update.message.reply_text("\n".join(results))
+        await update.message.reply_text("\n".join(results), parse_mode="HTML")
         return
     paid = get_sales(limit=50, seller_id=seller_id, status="paid")
     if not paid:
@@ -284,7 +265,7 @@ async def markpendingpayment_cmd(update: Update, context: ContextTypes.DEFAULT_T
         sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
         buttons.append([
             InlineKeyboardButton(
-                f"{esc(sale_code)} | {esc(sd.get('buyer_name'))} | ₹{sd.get('price', 0):.0f}",
+                f"{esc(sale_code)} | {config.CURRENCY}{sd.get('price', 0):.0f}",
                 callback_data=f"marksalepending:{sd.get('id')}",
             )
         ])
@@ -311,7 +292,7 @@ def _fmt_sales_page(sales, page, total_pages, summary=None):
         cat = sd.get("category_name", "—")
         acct_id = sd.get("account_id", "")
         text += (
-            f"• {code(sale_code)} | Acct {code_id(acct_id)} | {esc(sd.get('buyer_name'))} | "
+            f"• {code(sale_code)} | Acct {code_id(acct_id)} | "
             f"{config.CURRENCY}{sd.get('price', 0):.0f} | {ps_emoji} | "
             f"{esc(cat)} | {date}\n"
         )
@@ -393,7 +374,7 @@ async def _editsale_process_ids(update, context, raw_input):
         else:
             invalid_ids.append(id_str)
     if not valid_sales:
-        await update.message.reply_text(f"⚠️ Not found: {', '.join(code(i) for i in invalid_ids)}")
+        await update.message.reply_text(f"⚠️ Not found: {', '.join(code(i) for i in invalid_ids)}", parse_mode="HTML")
         return
     state.set(user_id, "editsale_ids", [s["id"] for s in valid_sales])
     state.set(user_id, "editsale_pending", {})
@@ -403,19 +384,16 @@ async def _editsale_process_ids(update, context, raw_input):
 
 
 def _editsale_summary(sales, invalid_ids=None, created_drafts=None):
-    pending = {}
     if sales:
-        user_id = None
         text = "<b>✏️ Editing sales:</b>\n\n"
         for s in sales:
             ps = s.get("payment_status", "pending")
             ps_emoji = "✅" if ps == "paid" else "🟡"
-            buyer = esc(s.get("buyer_name")) or "—"
             price = s.get("price", 0) or 0
             sale_code = s.get("sale_code", f"#{s.get('id', '')}")
             text += (
-                f"• {code(sale_code)} | {buyer} | "
-                f"₹{price:.0f} | {ps_emoji} {esc(ps)}\n"
+                f"• {code(sale_code)} | "
+                f"{config.CURRENCY}{price:.0f} | {ps_emoji} {esc(ps)}\n"
             )
     else:
         text = "<b>✏️ Editing sales:</b>\n\n"
@@ -434,13 +412,12 @@ def _editsale_summary_with_pending(sales, pending, invalid_ids=None, created_dra
         p = pending.get(sid, {})
         ps = p.get("payment_status", s.get("payment_status", "pending"))
         ps_emoji = "✅" if ps == "paid" else "🟡"
-        buyer = esc(p.get("buyer_name", s.get("buyer_name"))) or "—"
         price = p.get("price", s.get("price", 0)) or 0
         sale_code = s.get("sale_code", f"#{sid}")
         text += (
-            f"• {code(sale_code)} | {buyer} | "
-            f"₹{price:.0f} | {ps_emoji} {esc(ps)}\n"
-        )
+            f"• {code(sale_code)} | "
+                f"{config.CURRENCY}{price:.0f} | {ps_emoji} {esc(ps)}\n"
+            )
     if created_drafts:
         for acct_id, sale_code in created_drafts:
             text += f"\n📝 Created {code(sale_code)} for account {code_id(acct_id)}"
@@ -452,7 +429,6 @@ def _editsale_summary_with_pending(sales, pending, invalid_ids=None, created_dra
 def _editsale_field_keyboard():
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("👤 Buyer", callback_data="editsale:field:buyer"),
             InlineKeyboardButton("💰 Price", callback_data="editsale:field:price"),
         ],
         [

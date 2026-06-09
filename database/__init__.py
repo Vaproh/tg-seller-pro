@@ -14,8 +14,7 @@ from database.accounts import (
 )
 from database.sales import (
     sell_account, bulk_sell_accounts, mark_payment,
-    get_sales, count_sales, get_sale_by_id, get_buyers,
-    get_buyer_names, get_buyer_sales, get_sales_summary, void_sale,
+    get_sales, count_sales, get_sale_by_id, get_sales_summary, void_sale,
 )
 from database.sellers import (
     add_seller, remove_seller, list_sellers,
@@ -40,8 +39,7 @@ __all__ = [
     "get_available_accounts_for_category", "export_accounts_csv",
     "get_available_account_ids",
     "sell_account", "bulk_sell_accounts", "mark_payment",
-    "get_sales", "count_sales", "get_sale_by_id", "get_buyers",
-    "get_buyer_names", "get_buyer_sales", "get_sales_summary", "void_sale",
+    "get_sales", "count_sales", "get_sale_by_id", "get_sales_summary", "void_sale",
     "add_seller", "remove_seller", "list_sellers",
     "get_seller_by_user_id", "get_seller_by_id", "is_seller_active",
     "create_retrieval_session", "add_retrieval_item",

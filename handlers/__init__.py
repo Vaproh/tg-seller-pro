@@ -9,7 +9,7 @@ from handlers.accounts import (
     bulkdelete_cmd, extractcsv_cmd, list_cmd,
 )
 from handlers.sell import (
-    sell_cmd, bulksell_cmd, sales_cmd, sale_cmd,
+    sell_cmd, sales_cmd, sale_cmd,
     markpaid_cmd, voidsale_cmd,
     marksold_cmd, markunsold_cmd, markpendingpayment_cmd,
     editsale_cmd,
@@ -18,7 +18,6 @@ from handlers.preview import preview_cmd
 from handlers.search import search_cmd
 from handlers.categories import categories_cmd, addcategory_cmd, deletecategory_cmd
 from handlers.inventory import inventory_cmd
-from handlers.buyers import buyers_cmd, buyer_cmd
 from handlers.reports import report_cmd
 from handlers.sellers import addseller_cmd, removeseller_cmd, listsellers_cmd
 from handlers.export import export_cmd, backup_cmd
@@ -47,7 +46,6 @@ def register_handlers(application: Application):
     application.add_handler(CommandHandler("list", list_cmd))
 
     application.add_handler(CommandHandler("sell", sell_cmd))
-    application.add_handler(CommandHandler("bulksell", bulksell_cmd))
     application.add_handler(CommandHandler("sales", sales_cmd))
     application.add_handler(CommandHandler("sale", sale_cmd))
     application.add_handler(CommandHandler("markpaid", markpaid_cmd))
@@ -65,9 +63,6 @@ def register_handlers(application: Application):
     application.add_handler(CommandHandler("deletecategory", deletecategory_cmd))
 
     application.add_handler(CommandHandler("inventory", inventory_cmd))
-
-    application.add_handler(CommandHandler("buyers", buyers_cmd))
-    application.add_handler(CommandHandler("buyer", buyer_cmd))
 
     application.add_handler(CommandHandler("report", report_cmd))
 

@@ -93,7 +93,7 @@ def _build_pending_payment_report():
         for s in pending:
             sale_code = s.get("sale_code", f"#{s.get('id', '?')}")
             lines.append(
-                f"• {code(sale_code)} | {code(s.get('buyer_name', '—'))} | "
+                f"• {code(sale_code)} | "
                 f"{config.CURRENCY}{s.get('price', 0):.0f} | {str(s.get('sold_at', ''))[:10]}"
             )
         lines.append("")
