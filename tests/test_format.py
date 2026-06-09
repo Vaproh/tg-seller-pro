@@ -85,4 +85,4 @@ class TestFmtReceipt:
         result = fmt_receipt(sale)
         assert "u1" in result
         assert "100" in result
-        assert "Paid" in result
+        assert "paid" in result
