@@ -132,15 +132,11 @@ async def voidsale_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ids = [x.strip() for x in args[0].split(",") if x.strip()]
     valid, invalid = [], []
     for id_str in ids:
-        try:
-            sale_id = int(id_str)
-        except ValueError:
-            invalid.append(id_str)
-            continue
-        sale = get_sale_by_id(sale_id)
+        sale = get_sale_by_id(id_str)
         if not sale:
             invalid.append(id_str)
             continue
+        sale_id = _d(sale).get("id")
         sale_code = _d(sale).get("sale_code", f"#{sale_id}")
         void_sale(sale_id)
         valid.append(sale_code)

@@ -17,6 +17,7 @@ from database import (
     get_available_accounts_for_category,
 )
 from database.sales import get_sales_summary
+from telegram.error import BadRequest
 
 
 async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str, user_id: int) -> bool:
@@ -116,7 +117,10 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             include_all=True, include_available=True, include_sold=True,
             include_pending=True, include_ids=True,
         )
-        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        try:
+            await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        except BadRequest:
+            pass
         return True
 
     if data.startswith("delfilter:") and not data.startswith("delfiltercat") and not data.startswith("delfilterids") and not data.startswith("delfilterpage:"):
@@ -197,7 +201,10 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             include_all=True, include_available=True, include_sold=True,
             include_pending=True, include_ids=True,
         )
-        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        try:
+            await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        except BadRequest:
+            pass
         return True
 
     if data.startswith("delsingle:"):
@@ -352,7 +359,10 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             include_all=True, include_available=True, include_sold=True,
             include_pending=True,
         )
-        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        try:
+            await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        except BadRequest:
+            pass
         return True
 
     if data.startswith("markstatus:"):

@@ -10,6 +10,7 @@ from database.accounts import (
     update_account_optional_fields, delete_account, delete_accounts_by_ids,
     delete_accounts_in_category, get_accounts_for_category,
     get_available_accounts_for_category, export_accounts_csv,
+    get_available_account_ids,
 )
 from database.sales import (
     sell_account, bulk_sell_accounts, mark_payment,
@@ -37,6 +38,7 @@ __all__ = [
     "update_account_optional_fields", "delete_account", "delete_accounts_by_ids",
     "delete_accounts_in_category", "get_accounts_for_category",
     "get_available_accounts_for_category", "export_accounts_csv",
+    "get_available_account_ids",
     "sell_account", "bulk_sell_accounts", "mark_payment",
     "get_sales", "count_sales", "get_sale_by_id", "get_buyers",
     "get_buyer_names", "get_buyer_sales", "get_sales_summary", "void_sale",

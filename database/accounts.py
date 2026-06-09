@@ -106,6 +106,18 @@ def list_accounts(limit=20, offset=0, status=None, category_id=None,
         conn.close()
 
 
+def get_available_account_ids(limit):
+    conn = connect()
+    try:
+        rows = conn.execute(
+            "SELECT id FROM accounts WHERE status = 'available' ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [r["id"] for r in rows]
+    finally:
+        conn.close()
+
+
 def count_accounts(status=None, category_id=None, status_list=None, id_list=None):
     conn = connect()
     try:

@@ -64,10 +64,13 @@ def count_from_filter(filter_str):
 
 def fmt_account_list_line(account):
     a = _d(account)
+    status = a.get("status", "available")
+    status_emoji = {"available": "🟢", "sold": "🔴", "pending_payment": "🟡"}.get(status, "⚪")
     return (
         f"• ID: {code_id(a.get('id', ''))}  |  "
         f"User: {code_username(a.get('username'))}  |  "
-        f"Category: {esc(a.get('category_name', '—'))}"
+        f"{status_emoji} {esc(status)}  |  "
+        f"{esc(a.get('category_name', '—'))}"
     )
 
 

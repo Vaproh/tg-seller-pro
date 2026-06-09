@@ -367,7 +367,36 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ── Bulk sell flow ─────────────────────────────────────
-    # (removed old bulksell_stage=="number" — /bulksell now uses same select UI as /sell)
+    if sell_stage == "number":
+        from database import count_accounts, get_available_account_ids
+        try:
+            num = int(text)
+        except ValueError:
+            await update.message.reply_text("⚠️ Enter a valid number:")
+            return
+        available = count_accounts(status="available")
+        if num < 1:
+            await update.message.reply_text("⚠️ Must be at least 1:")
+            return
+        if num > available:
+            await update.message.reply_text(f"⚠️ Only {available} available. Enter a smaller number:")
+            return
+        account_ids = get_available_account_ids(num)
+        state.set(user_id, "sell_selected", account_ids)
+        state.set(user_id, "sell_mode", "bulk")
+        state.set(user_id, "sell_stage", "buyer")
+        from database import get_buyer_names
+        from core.filters import buyer_keyboard
+        buyer_names = get_buyer_names()
+        if buyer_names:
+            kb = buyer_keyboard(buyer_names, "buypick")
+            await update.message.reply_text(
+                f"✅ Selected {num} accounts.\n\n👤 Select buyer or type a new one:",
+                reply_markup=kb,
+            )
+        else:
+            await update.message.reply_text(f"✅ Selected {num} accounts.\n\n👤 Enter buyer name:")
+        return
 
 
 async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
