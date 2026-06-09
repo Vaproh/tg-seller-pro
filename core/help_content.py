@@ -42,6 +42,7 @@ HELP_MAIN_ADMIN = """<b>📖 Help — Admin</b>
 <b>⚙️ Tools</b>
 /export — Download Excel file
 /backup — Download database
+/stats — Revenue stats & charts
 /ping — Check if bot works
 /help — This menu
 
@@ -74,6 +75,7 @@ HELP_MAIN_SELLER = """<b>📖 Help — Seller</b>
 /buyer — See one buyer's orders
 
 <b>⚙️ Tools</b>
+/stats — Revenue stats & charts
 /ping — Check if bot works
 /help — This menu
 

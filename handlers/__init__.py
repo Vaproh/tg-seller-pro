@@ -22,6 +22,7 @@ from handlers.buyers import buyers_cmd, buyer_cmd
 from handlers.reports import report_cmd
 from handlers.sellers import addseller_cmd, removeseller_cmd, listsellers_cmd
 from handlers.export import export_cmd, backup_cmd
+from handlers.stats import stats_cmd
 from handlers.callbacks import handle_callback
 from handlers.messages import handle_text, handle_csv_upload
 from handlers.errors import error_handler
@@ -76,6 +77,7 @@ def register_handlers(application: Application):
 
     application.add_handler(CommandHandler("export", export_cmd))
     application.add_handler(CommandHandler("backup", backup_cmd))
+    application.add_handler(CommandHandler("stats", stats_cmd))
 
     application.add_handler(CallbackQueryHandler(handle_callback))
 

@@ -93,9 +93,10 @@ def settings_keyboard():
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📊 Stats", callback_data="menu:stats"),
-            InlineKeyboardButton("📤 Export", callback_data="menu:export"),
+            InlineKeyboardButton("📈 Revenue", callback_data="stats:all"),
         ],
         [
+            InlineKeyboardButton("📤 Export", callback_data="menu:export"),
             InlineKeyboardButton("💾 Backup", callback_data="menu:backup"),
         ],
         [

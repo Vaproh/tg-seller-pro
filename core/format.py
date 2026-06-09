@@ -80,16 +80,20 @@ def fmt_sale_block(sale):
     ps = s.get("payment_status", "pending")
     ps_emoji = "✅" if ps == "paid" else "🟡" if ps == "pending" else "⚪"
     sale_code = s.get("sale_code", f"#{s.get('id', '')}")
+    username = s.get("username", "")
+    email = s.get("email")
     lines = [
         f"╭─ {code(sale_code)} ────────────────",
-        f"│ 👤 Buyer: {code(s.get('buyer_name'))}",
+        f"│ 👤 Username: {code(username)}",
         f"│ 💰 Price: {config.CURRENCY}{s.get('price', 0):.0f}",
         f"│ 💳 Payment: {ps_emoji} {esc(ps)}",
+        f"│ 📅 Sold: {esc(str(s.get('sold_at', ''))[:16])}",
+        f"│ 👨‍💼 Seller: {esc(s.get('seller_name', '—'))}",
+        f"│ 🔗 Profile: {code(reddit_url(username))}",
+        f"│ 📂 Category: {esc(s.get('category_name', '—'))}",
     ]
-    lines.append(f"│ 📅 Sold: {esc(str(s.get('sold_at', ''))[:10])}")
-    lines.append(f"│ 👨‍💼 Seller: {esc(s.get('seller_name', '—'))}")
-    lines.append(f"│ 🔗 Profile: {code(reddit_url(s.get('username', '')))}")
-    lines.append(f"│ 📂 Category: {esc(s.get('category_name', '—'))}")
+    if email:
+        lines.append(f"│ 📧 Email: {code(email)}")
     if s.get("notes"):
         lines.append(f"│ 📝 Notes: {esc(s['notes'])}")
     lines.append("╰──────────────────────────")

@@ -338,3 +338,94 @@ def create_draft_sale(account_id, seller_id):
         return None
     finally:
         conn.close()
+
+
+def get_revenue_by_day(days=30, seller_id=None):
+    conn = connect()
+    try:
+        query = """
+            SELECT DATE(s.sold_at) as day, SUM(s.price) as revenue, COUNT(*) as count
+            FROM sales s
+            WHERE s.sold_at >= DATE('now', 'localtime', ?)
+        """
+        params = [f"-{days} days"]
+        if seller_id is not None:
+            query += " AND s.seller_id = ?"
+            params.append(seller_id)
+        query += " GROUP BY day ORDER BY day"
+        return conn.execute(query, params).fetchall()
+    finally:
+        conn.close()
+
+
+def get_sales_by_category(seller_id=None):
+    conn = connect()
+    try:
+        query = """
+            SELECT c.name as category, COUNT(*) as count, SUM(s.price) as revenue
+            FROM sales s
+            JOIN accounts a ON a.id = s.account_id
+            JOIN categories c ON c.id = a.category_id
+            WHERE 1=1
+        """
+        params = []
+        if seller_id is not None:
+            query += " AND s.seller_id = ?"
+            params.append(seller_id)
+        query += " GROUP BY c.name ORDER BY revenue DESC"
+        return conn.execute(query, params).fetchall()
+    finally:
+        conn.close()
+
+
+def get_top_buyers(limit=10, seller_id=None):
+    conn = connect()
+    try:
+        query = """
+            SELECT s.buyer_name, COUNT(*) as total_sales, SUM(s.price) as total_spent
+            FROM sales s
+            WHERE 1=1
+        """
+        params = []
+        if seller_id is not None:
+            query += " AND s.seller_id = ?"
+            params.append(seller_id)
+        query += " GROUP BY LOWER(s.buyer_name) ORDER BY total_spent DESC LIMIT ?"
+        params.append(limit)
+        return conn.execute(query, params).fetchall()
+    finally:
+        conn.close()
+
+
+def get_top_sellers(limit=10):
+    conn = connect()
+    try:
+        query = """
+            SELECT sl.name as seller_name, COUNT(*) as total_sales, SUM(s.price) as total_revenue
+            FROM sales s
+            JOIN sellers sl ON sl.id = s.seller_id
+            GROUP BY sl.id
+            ORDER BY total_revenue DESC
+            LIMIT ?
+        """
+        return conn.execute(query, (limit,)).fetchall()
+    finally:
+        conn.close()
+
+
+def get_payment_breakdown(seller_id=None):
+    conn = connect()
+    try:
+        query = """
+            SELECT s.payment_status, COUNT(*) as count, SUM(s.price) as amount
+            FROM sales s
+            WHERE 1=1
+        """
+        params = []
+        if seller_id is not None:
+            query += " AND s.seller_id = ?"
+            params.append(seller_id)
+        query += " GROUP BY s.payment_status"
+        return conn.execute(query, params).fetchall()
+    finally:
+        conn.close()

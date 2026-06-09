@@ -6,7 +6,7 @@ from core.format import _d, _truncate, esc, code, code_id
 from core.keyboards import confirm_keyboard
 from core.filters import PAGE_SIZE
 from database import get_sale_by_id, count_sales, get_sales, get_seller_by_user_id, mark_payment, void_sale
-from database.sales import update_sale
+from database.sales import update_sale, get_sales_summary
 from utils.notifications import notify_admin, fmt_void_notification
 
 
@@ -28,7 +28,8 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
         sales = get_sales(limit=PAGE_SIZE, offset=0, seller_id=seller_id)
         from handlers.sell import _fmt_sales_page, _sales_keyboard
-        text = _fmt_sales_page(sales, 1, total_pages)
+        summary = get_sales_summary(seller_id=seller_id)
+        text = _fmt_sales_page(sales, 1, total_pages, summary=summary)
         kb = _sales_keyboard(1, total_pages)
         await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return True
@@ -50,7 +51,8 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
         sales = get_sales(limit=PAGE_SIZE, offset=0, seller_id=seller_id, status=status_val)
         from handlers.sell import _fmt_sales_page, _sales_keyboard
-        text = _fmt_sales_page(sales, 1, total_pages)
+        summary = get_sales_summary(seller_id=seller_id, period=status_val)
+        text = _fmt_sales_page(sales, 1, total_pages, summary=summary)
         kb = _sales_keyboard(1, total_pages)
         await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return True
@@ -73,7 +75,8 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         state.set(user_id, "sales_page", page)
         sales = get_sales(limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE, seller_id=seller_id, status=status_val)
         from handlers.sell import _fmt_sales_page, _sales_keyboard
-        text = _fmt_sales_page(sales, page, total_pages)
+        summary = get_sales_summary(seller_id=seller_id, period=sf)
+        text = _fmt_sales_page(sales, page, total_pages, summary=summary)
         kb = _sales_keyboard(page, total_pages)
         await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return True

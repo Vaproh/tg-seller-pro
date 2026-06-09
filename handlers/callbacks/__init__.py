@@ -9,6 +9,7 @@ from handlers.callbacks.sales import try_handle as handle_sales
 from handlers.callbacks.csv import try_handle as handle_csv
 from handlers.callbacks.search import try_handle as handle_search
 from handlers.callbacks.misc import try_handle as handle_misc
+from handlers.stats import stats_callback
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -29,3 +30,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ):
         if await handler(update, context, data, user_id):
             return
+
+    if await stats_callback(update, context, data, user_id):
+        return

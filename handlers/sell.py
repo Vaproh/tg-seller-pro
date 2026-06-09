@@ -16,7 +16,8 @@ from database import (
     get_seller_by_user_id, set_account_status,
     get_account_by_id,
 )
-from database.sales import create_draft_sale
+from database.sales import create_draft_sale, get_sales_summary
+import config
 
 
 async def sell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -68,7 +69,8 @@ async def sales_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
     sales = get_sales(limit=PAGE_SIZE, offset=0, seller_id=seller_id)
-    text = _fmt_sales_page(sales, 1, total_pages)
+    summary = get_sales_summary(seller_id=seller_id)
+    text = _fmt_sales_page(sales, 1, total_pages, summary=summary)
     kb = _sales_keyboard(1, total_pages)
     await update.message.reply_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
 
@@ -237,17 +239,27 @@ async def markpendingpayment_cmd(update: Update, context: ContextTypes.DEFAULT_T
     await update.message.reply_text("\n".join(parts))
 
 
-def _fmt_sales_page(sales, page, total_pages):
-    text = f"<b>📈 Sales  page {page}/{total_pages}</b>\n\n"
+def _fmt_sales_page(sales, page, total_pages, summary=None):
+    text = ""
+    if summary:
+        s = summary
+        text += (
+            f"💰 <b>Revenue:</b> {config.CURRENCY}{s.get('total_revenue', 0):.0f}  "
+            f"📊 <b>Sales:</b> {s.get('total_sales', 0)}  "
+            f"🟡 <b>Pending:</b> {config.CURRENCY}{s.get('pending_amount', 0):.0f}\n\n"
+        )
+    text += f"<b>📈 Sales — page {page}/{total_pages}</b>\n\n"
     for s in sales:
         sd = _d(s)
         ps = sd.get("payment_status", "pending")
         ps_emoji = "✅" if ps == "paid" else "🟡" if ps == "pending" else "⚪"
         sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
+        date = str(sd.get("sold_at", ""))[:10]
+        cat = sd.get("category_name", "—")
         text += (
             f"• {code(sale_code)} | {esc(sd.get('buyer_name'))} | "
-            f"₹{sd.get('price', 0):.0f} | {ps_emoji} {esc(ps)} | "
-            f"{esc(sd.get('seller_name', '—'))}\n"
+            f"{config.CURRENCY}{sd.get('price', 0):.0f} | {ps_emoji} | "
+            f"{esc(cat)} | {date}\n"
         )
     if not sales:
         text += "📭 No sales found."
