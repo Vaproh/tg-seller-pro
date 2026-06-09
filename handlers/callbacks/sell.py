@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 from core.permissions import require_seller
 from core.state import state
 from core.format import esc, code, code_id, spoiler, _d, fmt_receipt, _truncate
-from core.keyboards import confirm_keyboard, sell_select_keyboard
+from core.keyboards import confirm_keyboard, sell_select_keyboard, category_keyboard
 from core.filters import (
     buyer_keyboard, apply_list_filters,
     fmt_account_list_line, PAGE_SIZE,
@@ -21,12 +21,23 @@ def _refresh_select_page(user_id, query):
     selected = state.get(user_id, "sell_selected", [])
     page = state.get(user_id, "sell_page", 1)
     filter_str = state.get(user_id, "sell_filter") or "status:available"
+    cat_id = state.get(user_id, "sell_category")
+    if cat_id:
+        filter_str = f"cat:{cat_id}|{filter_str}"
     accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE)
     total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
     page = max(1, min(page, total_pages))
     mode = state.get(user_id, "sell_mode", "bulk")
     max_select = 1 if mode == "single" else None
     return selected, accounts, page, total_pages, max_select, filter_str
+
+
+def _sell_filter_str(user_id):
+    cat_id = state.get(user_id, "sell_category")
+    base = "status:available"
+    if cat_id:
+        return f"cat:{cat_id}|{base}"
+    return base
 
 
 async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str, user_id: int) -> bool:
@@ -39,6 +50,28 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         if not seller:
             await query.edit_message_text("⚠️ You are not registered as a seller.")
             return True
+        kb = category_keyboard("sellcat", include_all=True)
+        if not kb:
+            state.set(user_id, "sell_category", None)
+            kb2 = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("👆 Pick account", callback_data="sellmode:select"),
+                    InlineKeyboardButton("🎲 Pick any", callback_data="sellmode:any"),
+                ],
+            ])
+            await query.edit_message_text("💰 Sell an account:", reply_markup=kb2)
+        else:
+            await query.edit_message_text("📂 Select category to sell from:", reply_markup=kb)
+        return True
+
+    if data.startswith("sellcat:"):
+        if not await require_seller(update):
+            return True
+        cat_value = data.split(":", 1)[1]
+        if cat_value == "all":
+            state.set(user_id, "sell_category", None)
+        else:
+            state.set(user_id, "sell_category", int(cat_value))
         kb = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("👆 Pick account", callback_data="sellmode:select"),
@@ -48,15 +81,33 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         await query.edit_message_text("💰 Sell an account:", reply_markup=kb)
         return True
 
+    if data.startswith("bulksellcat:"):
+        if not await require_seller(update):
+            return True
+        cat_value = data.split(":", 1)[1]
+        if cat_value == "all":
+            state.set(user_id, "sell_category", None)
+        else:
+            state.set(user_id, "sell_category", int(cat_value))
+        kb = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("👆 Select accounts", callback_data="bulksellmode:select"),
+                InlineKeyboardButton("🔢 Enter number", callback_data="bulksellmode:number"),
+            ],
+        ])
+        await query.edit_message_text("💰 How would you like to bulk sell?", reply_markup=kb)
+        return True
+
     if data.startswith("sellmode:"):
         if not await require_seller(update):
             return True
         mode = data.split(":", 1)[1]
+        filter_str = _sell_filter_str(user_id)
         if mode == "select":
             state.set(user_id, "sell_mode", "single")
             state.set(user_id, "sell_selected", [])
             state.set(user_id, "sell_page", 1)
-            accounts, total = apply_list_filters("status:available", limit=PAGE_SIZE, offset=0)
+            accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
             total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
             text = f"<b>💰 Sell 1 Account — Tap to select</b>\n\n"
             for acc in accounts:
@@ -64,7 +115,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             kb = sell_select_keyboard([], accounts, 1, total_pages, max_select=1)
             await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         elif mode == "any":
-            accounts, total = apply_list_filters("status:available", limit=1, offset=0)
+            accounts, total = apply_list_filters(filter_str, limit=1, offset=0)
             if not accounts:
                 await query.edit_message_text("📭 No available accounts to sell.")
                 return True
@@ -89,11 +140,12 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         if not await require_seller(update):
             return True
         mode = data.split(":", 1)[1]
+        filter_str = _sell_filter_str(user_id)
         if mode == "select":
             state.set(user_id, "sell_mode", "bulk")
             state.set(user_id, "sell_selected", [])
             state.set(user_id, "sell_page", 1)
-            accounts, total = apply_list_filters("status:available", limit=PAGE_SIZE, offset=0)
+            accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
             total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
             text = f"<b>💰 Bulk Sell — Tap to select accounts</b>\n\n"
             for acc in accounts:
@@ -274,6 +326,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         state.pop(user_id, "sell_stage", None)
         state.pop(user_id, "sell_filter", None)
         state.pop(user_id, "sell_page", None)
+        state.pop(user_id, "sell_category", None)
 
         if not selected or not buyer:
             await query.edit_message_text("⚠️ Session expired. Please start over.")
@@ -309,7 +362,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
 
     if data == "sellcancel":
         for key in ("sell_selected", "sell_buyer", "sell_price", "sell_payment_status",
-                     "sell_stage", "sell_filter", "sell_page", "sell_mode"):
+                     "sell_stage", "sell_filter", "sell_page", "sell_mode", "sell_category"):
             state.pop(user_id, key, None)
         await query.edit_message_text("❌ Sale cancelled.")
         return True

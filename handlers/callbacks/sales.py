@@ -247,7 +247,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         field = state.get(user_id, "editsale_field")
         sale_ids = state.get(user_id, "editsale_ids", [])
         pending = state.get(user_id, "editsale_pending", {})
-        field_key = "buyer_name" if field == "buyer" else field
+        field_key = "buyer_name" if field == "buyer" else ("payment_status" if field == "status" else field)
         for sid in sale_ids:
             if sid not in pending:
                 pending[sid] = {}

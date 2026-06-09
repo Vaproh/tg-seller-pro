@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 from core.permissions import require_seller, require_admin, get_user_role
 from core.state import state
 from core.format import esc, code, code_id, fmt_sale_block, _d, _truncate
-from core.keyboards import confirm_keyboard, sell_select_keyboard
+from core.keyboards import confirm_keyboard, sell_select_keyboard, category_keyboard
 from core.filters import (
     apply_list_filters,
     fmt_account_list_line,
@@ -12,7 +12,7 @@ from core.filters import (
 )
 from database import (
     sell_account, get_sales, count_sales,
-    get_sale_by_id, void_sale,
+    get_sale_by_id, void_sale, mark_payment,
     get_seller_by_user_id, set_account_status,
     get_account_by_id,
 )
@@ -45,13 +45,18 @@ async def bulksell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not seller:
         await update.message.reply_text("⚠️ You are not registered as a seller.")
         return
-    kb = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("👆 Select accounts", callback_data="bulksellmode:select"),
-            InlineKeyboardButton("🔢 Enter number", callback_data="bulksellmode:number"),
-        ],
-    ])
-    await update.message.reply_text("💰 How would you like to bulk sell?", reply_markup=kb)
+    kb = category_keyboard("bulksellcat", include_all=True)
+    if not kb:
+        state.set(user_id, "sell_category", None)
+        kb2 = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("👆 Select accounts", callback_data="bulksellmode:select"),
+                InlineKeyboardButton("🔢 Enter number", callback_data="bulksellmode:number"),
+            ],
+        ])
+        await update.message.reply_text("💰 How would you like to bulk sell?", reply_markup=kb2)
+    else:
+        await update.message.reply_text("📂 Select category to bulk sell from:", reply_markup=kb)
 
 
 async def sales_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -100,6 +105,24 @@ async def markpaid_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     role = get_user_role(user_id)
     seller = get_seller_by_user_id(user_id) if role != "admin" else None
     seller_id = seller["id"] if seller else None
+    args = context.args
+    if args:
+        ids = [x.strip() for x in args[0].split(",") if x.strip()]
+        results = []
+        for id_str in ids:
+            sale = get_sale_by_id(id_str)
+            if not sale:
+                results.append(f"⚠️ Not found: {code(id_str)}")
+                continue
+            sd = _d(sale)
+            sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
+            old_status = sd.get("payment_status", "pending")
+            new_status = "paid" if old_status == "pending" else "pending"
+            mark_payment(sd.get("id"), new_status)
+            label = "paid" if new_status == "paid" else "🟡 pending"
+            results.append(f"✅ {code(sale_code)} → {label}")
+        await update.message.reply_text("\n".join(results))
+        return
     pending = get_sales(limit=50, seller_id=seller_id, status="pending")
     if not pending:
         await update.message.reply_text("📭 No pending payments.")

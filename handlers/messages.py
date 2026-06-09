@@ -341,7 +341,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     editsale_field = state.get(user_id, "editsale_field")
-    if editsale_field in ("buyer", "price", "notes"):
+    if editsale_field in ("buyer", "price", "notes", "status"):
         sale_ids = state.get(user_id, "editsale_ids", [])
         pending = state.get(user_id, "editsale_pending", {})
         if editsale_field == "buyer":
@@ -349,17 +349,25 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"⚠️ Buyer name too long (max {config.MAX_BUYER_LEN} chars).")
                 return
             value = text
+            field_key = "buyer_name"
         elif editsale_field == "price":
             try:
                 value = float(text.replace("₹", "").replace(",", ""))
             except ValueError:
                 await update.message.reply_text("⚠️ Enter a valid price:")
                 return
+            field_key = "price"
         elif editsale_field == "notes":
             value = None if text.lower() == "/clear" else text
+            field_key = "notes"
+        elif editsale_field == "status":
+            if text.lower() not in ("paid", "pending"):
+                await update.message.reply_text("⚠️ Enter 'paid' or 'pending':")
+                return
+            value = text.lower()
+            field_key = "payment_status"
         else:
             return
-        field_key = "buyer_name" if editsale_field == "buyer" else editsale_field
         for sid in sale_ids:
             if sid not in pending:
                 pending[sid] = {}
