@@ -41,11 +41,11 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             return True
         kb = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("👆 Select account", callback_data="sellmode:select"),
-                InlineKeyboardButton("🔢 Enter number", callback_data="sellmode:number"),
+                InlineKeyboardButton("👆 Pick account", callback_data="sellmode:select"),
+                InlineKeyboardButton("🎲 Pick any", callback_data="sellmode:any"),
             ],
         ])
-        await query.edit_message_text("💰 How would you like to sell?", reply_markup=kb)
+        await query.edit_message_text("💰 Sell an account:", reply_markup=kb)
         return True
 
     if data.startswith("sellmode:"):
@@ -63,13 +63,26 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
                 text += fmt_account_list_line(acc) + "\n"
             kb = sell_select_keyboard([], accounts, 1, total_pages, max_select=1)
             await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
-        elif mode == "number":
-            from database import count_accounts
-            available = count_accounts(status="available")
-            state.set(user_id, "sell_stage", "number")
-            await query.edit_message_text(
-                f"🔢 How many accounts to sell? (available: {available})"
-            )
+        elif mode == "any":
+            accounts, total = apply_list_filters("status:available", limit=1, offset=0)
+            if not accounts:
+                await query.edit_message_text("📭 No available accounts to sell.")
+                return True
+            acc = dict(accounts[0])
+            state.set(user_id, "sell_mode", "single")
+            state.set(user_id, "sell_selected", [acc["id"]])
+            buyer_names = get_buyer_names()
+            if buyer_names:
+                kb = buyer_keyboard(buyer_names, "buypick")
+                await query.edit_message_text(
+                    f"🎲 Picked: #{acc['id']} — {esc(acc['username'])}\n\n👤 Select buyer or type a new one:",
+                    reply_markup=kb,
+                )
+            else:
+                state.set(user_id, "sell_stage", "buyer")
+                await query.edit_message_text(
+                    f"🎲 Picked: #{acc['id']} — {esc(acc['username'])}\n\n👤 Enter buyer name:"
+                )
         return True
 
     if data.startswith("bulksellmode:"):

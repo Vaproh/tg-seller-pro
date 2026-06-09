@@ -81,16 +81,16 @@ Type <b>/help command</b> for details on any command.
 Example: <b>/help sell</b>"""
 
 HELP_TOPICS = {
-    "sell": """<b>💰 /sell — Sell One or More Accounts</b>
+    "sell": """<b>💰 /sell — Sell an Account</b>
 
 <b>What it does:</b>
-Lets you sell accounts to a buyer.
+Lets you sell an account to a buyer.
 
 <b>How to use:</b>
 1. Type /sell
 2. Pick mode:
-   • <b>Select:</b> tap an account to pick it
-   • <b>Number:</b> type how many (auto-picks available accounts)
+   • <b>Pick account:</b> tap to select one
+   • <b>Pick any:</b> auto-picks one available account
 3. Pick a buyer or type their name
 4. Type the price
 5. Pick: 🟢 Sold or 🟡 Waiting for money

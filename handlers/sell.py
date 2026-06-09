@@ -29,11 +29,11 @@ async def sell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     kb = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("👆 Select account", callback_data="sellmode:select"),
-            InlineKeyboardButton("🔢 Enter number", callback_data="sellmode:number"),
+            InlineKeyboardButton("👆 Pick account", callback_data="sellmode:select"),
+            InlineKeyboardButton("🎲 Pick any", callback_data="sellmode:any"),
         ],
     ])
-    await update.message.reply_text("💰 How would you like to sell?", reply_markup=kb)
+    await update.message.reply_text("💰 Sell an account:", reply_markup=kb)
 
 
 async def bulksell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
