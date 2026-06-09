@@ -114,3 +114,32 @@ def report_period_keyboard():
             InlineKeyboardButton("All Time", callback_data="report:all"),
         ]
     ])
+
+
+def sell_select_keyboard(selected, accounts, page, total_pages, max_select=None):
+    buttons = []
+    for acc in accounts:
+        a = acc if isinstance(acc, dict) else dict(acc)
+        mark = "✅" if a["id"] in selected else "  "
+        buttons.append([
+            InlineKeyboardButton(
+                f"{mark} #{a['id']} | {a['username']}",
+                callback_data=f"selltoggle:{a['id']}",
+            )
+        ])
+    nav_row = []
+    if page > 1:
+        nav_row.append(InlineKeyboardButton("⬅️", callback_data=f"sellpage:{page - 1}"))
+    nav_row.append(InlineKeyboardButton(f"📄 {page}/{total_pages}", callback_data="noop"))
+    if page < total_pages:
+        nav_row.append(InlineKeyboardButton("➡️", callback_data=f"sellpage:{page + 1}"))
+    buttons.append(nav_row)
+    limit_text = " (max 1)" if max_select == 1 else ""
+    buttons.append([
+        InlineKeyboardButton(
+            f"✅ Done ({len(selected)} selected){limit_text}",
+            callback_data="selldone",
+        ),
+        InlineKeyboardButton("❌ Cancel", callback_data="sellcancel"),
+    ])
+    return InlineKeyboardMarkup(buttons)

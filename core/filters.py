@@ -1,5 +1,5 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from core.format import esc, _d, reddit_url
+from core.format import esc, _d, reddit_url, code_id, code_username
 from database import list_accounts, count_accounts, list_categories, get_category_name
 import config
 
@@ -65,8 +65,8 @@ def count_from_filter(filter_str):
 def fmt_account_list_line(account):
     a = _d(account)
     return (
-        f"• ID: {a.get('id', '')}  |  "
-        f"User: {esc(a.get('username'))}  |  "
+        f"• ID: {code_id(a.get('id', ''))}  |  "
+        f"User: {code_username(a.get('username'))}  |  "
         f"Category: {esc(a.get('category_name', '—'))}"
     )
 

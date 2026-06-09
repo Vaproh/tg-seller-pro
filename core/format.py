@@ -10,6 +10,30 @@ def esc(text):
     return html.escape(str(text))
 
 
+def code(text):
+    if text is None:
+        return "—"
+    return f"<code>{html.escape(str(text))}</code>"
+
+
+def spoiler(text):
+    if text is None:
+        return "—"
+    return f"<tg-spoiler>{html.escape(str(text))}</tg-spoiler>"
+
+
+def code_id(value):
+    return code(value)
+
+
+def code_username(value):
+    return code(value)
+
+
+def code_email(value):
+    return code(value)
+
+
 def _truncate(text, limit=MAX_MSG_LEN):
     if len(text) <= limit:
         return text
@@ -33,17 +57,17 @@ def fmt_account_block(account):
     status = a.get("status", "available")
     status_emoji = {"available": "🟢", "sold": "🔴", "pending_payment": "🟡"}.get(status, "⚪")
     lines = [
-        f"╭─ Account #{a.get('id', '')} ────────────────",
-        f"│ 👤 Username: {esc(a.get('username'))}",
-        f"│ 🔑 Password: <tg-spoiler>{esc(a.get('password'))}</tg-spoiler>",
+        f"╭─ Account #{code_id(a.get('id', ''))} ────────────────",
+        f"│ 👤 Username: {code_username(a.get('username'))}",
+        f"│ 🔑 Password: {spoiler(a.get('password'))}",
     ]
     if a.get("email"):
-        lines.append(f"│ 📧 Email: {esc(a['email'])}")
+        lines.append(f"│ 📧 Email: {code(a['email'])}")
     if a.get("email_password"):
-        lines.append(f"│ 🔑 Email Pass: <tg-spoiler>{esc(a['email_password'])}</tg-spoiler>")
+        lines.append(f"│ 🔑 Email Pass: {spoiler(a['email_password'])}")
     lines.append(f"│ 🔐 2FA: {'Yes' if a.get('has_2fa') else 'No'}")
     lines.append(f"│ ✅ Verified: {'Yes' if a.get('is_verified') else 'No'}")
-    lines.append(f"│ 🔗 Profile: {reddit_url(a.get('username', ''))}")
+    lines.append(f"│ 🔗 Profile: {code(reddit_url(a.get('username', '')))}")
     lines.append(f"│ 📂 Category: {esc(a.get('category_name', '—'))}")
     lines.append(f"│ 📦 Status: {status_emoji} {esc(status)}")
     lines.append(f"│ 📝 Notes: {esc(a.get('notes'))}")
@@ -58,13 +82,13 @@ def fmt_sale_block(sale):
     sale_code = s.get("sale_code", f"#{s.get('id', '')}")
     lines = [
         f"╭─ <b>{sale_code}</b> ────────────────",
-        f"│ 👤 Buyer: {esc(s.get('buyer_name'))}",
+        f"│ 👤 Buyer: {code(s.get('buyer_name'))}",
         f"│ 💰 Price: {config.CURRENCY}{s.get('price', 0):.0f}",
         f"│ 💳 Payment: {ps_emoji} {esc(ps)}",
     ]
     lines.append(f"│ 📅 Sold: {esc(str(s.get('sold_at', ''))[:10])}")
     lines.append(f"│ 👨‍💼 Seller: {esc(s.get('seller_name', '—'))}")
-    lines.append(f"│ 🔗 Profile: {reddit_url(s.get('username', ''))}")
+    lines.append(f"│ 🔗 Profile: {code(reddit_url(s.get('username', '')))}")
     lines.append(f"│ 📂 Category: {esc(s.get('category_name', '—'))}")
     if s.get("notes"):
         lines.append(f"│ 📝 Notes: {esc(s['notes'])}")
@@ -85,9 +109,9 @@ def fmt_receipt(sale):
         "╔══════════════════════════════════╗\n"
         "║     🧾 Reddit Account Receipt    ║\n"
         "╠══════════════════════════════════╣\n"
-        f"║ Account: {esc(username)}\n"
-        f"║ Password: <tg-spoiler>{esc(password)}</tg-spoiler>\n"
-        f"║ Profile: reddit.com/user/{esc(username)}\n"
+        f"║ Account: {code(username)}\n"
+        f"║ Password: {spoiler(password)}\n"
+        f"║ Profile: {code(reddit_url(username))}\n"
         "║──────────────────────────────────║\n"
         f"║ Price: {config.CURRENCY}{price:.0f}\n"
         f"║ Status: {ps_label}\n"

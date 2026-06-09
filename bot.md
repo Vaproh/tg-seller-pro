@@ -49,7 +49,7 @@ handlers/               Telegram handlers
     __init__.py           try_handle() chain dispatch
     menu.py               menu:back callback
     add.py                Add account wizard (add2fa, addverified, addcat, addconfirm, addcancel)
-    sell.py               Sell flow + bulk sell (sellconfirm, bulksellcancel, etc.)
+    sell.py               Sell flow (selltoggle, selldone, sellcancel, etc.)
     list.py               List, delete, inventory, mark status, bulk delete, category delete
     sales.py              Sales view + sale status (markpaid, marksaleunsold, sellervoidconfirm, voidconfirm)
     csv.py                CSV import (csvcol, csvbool, csvskip, csvconfirm, csvcancel)
@@ -386,12 +386,11 @@ Shared across `/list`, `/sell`, `/bulksell`, `/delete`, `/inventory`.
 | Flow | Keys |
 |------|------|
 | Add wizard | `add_stage`, `add_username`, `add_password`, `add_email`, etc. |
-| Sell | `sell_stage`, `sell_account_id`, `sell_buyer`, `sell_price`, `sell_payment_status` |
-| Bulk sell | `bulksell_stage`, `bulksell_selected`, `bulksell_buyer`, `bulksell_price` |
+| Sell (single + bulk) | `sell_mode`, `sell_selected`, `sell_stage`, `sell_buyer`, `sell_price`, `sell_payment_status`, `sell_page`, `sell_filter` |
 | Search | `search_stage`, `search_type` |
 | List/Delete/Inventory filters | `list_filter`, `list_page`, `delete_filter`, etc. |
 | CSV import | `csv_stage`, `csv_mapping`, `csv_headers`, `csv_data` |
-| ID input | `sell_ids_input`, `list_ids_input`, `del_ids_input` |
+| ID input | `list_ids_input`, `del_ids_input` |
 
 ---
 

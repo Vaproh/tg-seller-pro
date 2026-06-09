@@ -97,7 +97,7 @@ docker compose down
 | Command | Description |
 |---------|-------------|
 | `/sell` | Sell one account (available only) |
-| `/bulksell` | Bulk sell (select or by number) |
+| `/bulksell` | Bulk sell (tap to select multiple accounts) |
 | `/sales` | View all sales |
 | `/sale <id>` | View sale detail |
 | `/markpaid` | Mark pending sale as paid |

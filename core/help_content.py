@@ -88,14 +88,16 @@ Lets you sell one account to a buyer.
 
 <b>How to use:</b>
 1. Type /sell
-2. Pick an available account (🟢)
-3. Pick a buyer or type their name
-4. Type the price
-5. Pick: 🟢 Sold or 🟡 Waiting for money
-6. Confirm
+2. Tap an available account to select it (✅ shows)
+3. Tap "Done"
+4. Pick a buyer or type their name
+5. Type the price
+6. Pick: 🟢 Sold or 🟡 Waiting for money
+7. Confirm
 
 <b>Notes:</b>
 - Only 🟢 available accounts show up
+- You can only select 1 account
 - Price must be typed (no skipping)
 - Buyer names are saved for next time""",
 
@@ -106,13 +108,17 @@ Sell multiple accounts to one buyer at once.
 
 <b>How to use:</b>
 1. Type /bulksell
-2. Pick mode:
-   • <b>Select:</b> tap accounts to pick them
-   • <b>Number:</b> type how many (auto-picks)
-3. Pick buyer
-4. Type price per account
-5. Pick status: 🟢 or 🟡
-6. Confirm""",
+2. Tap accounts to select them (✅ shows)
+3. Tap "Done"
+4. Pick buyer
+5. Type price per account
+6. Pick status: 🟢 or 🟡
+7. Confirm
+
+<b>Notes:</b>
+- Tap accounts to toggle selection
+- Use ⬅️ ➡️ to go between pages
+- Same flow as /sell but for multiple accounts""",
 
     "sales": """<b>📈 /sales — View Sales</b>
 

@@ -1,5 +1,6 @@
 import logging
 from telegram import Bot
+from core.format import code_id
 from config import ADMIN_USER_ID
 
 logger = logging.getLogger(__name__)
@@ -43,11 +44,11 @@ def fmt_void_notification(sale_code):
 
 
 def fmt_seller_added(name, user_id):
-    return f"👤 New seller: {name} (ID: {user_id})"
+    return f"👤 New seller: {name} (ID: {code_id(user_id)})"
 
 
 def fmt_seller_removed(name, user_id):
-    return f"🚫 Seller removed: {name} (ID: {user_id})"
+    return f"🚫 Seller removed: {name} (ID: {code_id(user_id)})"
 
 
 def fmt_bulk_import(added, skipped, category):
@@ -55,4 +56,4 @@ def fmt_bulk_import(added, skipped, category):
 
 
 def fmt_status_change(account_id, old_status, new_status):
-    return f"⚠️ Account #{account_id} status: {old_status} → {new_status}"
+    return f"⚠️ Account {code_id(account_id)} status: {old_status} → {new_status}"

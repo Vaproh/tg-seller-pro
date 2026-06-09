@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller, require_admin
 from core.state import state
-from core.format import esc, _d, _truncate
+from core.format import esc, _d, _truncate, code_id, code_username
 from core.keyboards import confirm_keyboard, category_keyboard
 from core.filters import (
     filter_page_keyboard, apply_list_filters, count_from_filter,
@@ -213,7 +213,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             return True
         state.set(user_id, "delete_confirm", account_id)
         await query.edit_message_text(
-            f"⚠️ Delete account #{account_id} ({esc(_d(account)['username'])})?",
+            f"⚠️ Delete account {code_id(account_id)} ({code_username(_d(account)['username'])})?",
             reply_markup=confirm_keyboard(f"delconfirm:{account_id}", "delcancel"),
         )
         return True
@@ -369,7 +369,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         success = set_account_status(account_id, new_status)
         if success:
             emoji = {"available": "🟢", "sold": "🔴", "pending_payment": "🟡"}.get(new_status, "⚪")
-            await query.edit_message_text(f"✅ Account #{account_id} marked as {emoji} {new_status}.")
+            await query.edit_message_text(f"✅ Account {code_id(account_id)} marked as {emoji} {new_status}.")
         else:
             await query.edit_message_text("❌ Failed to update status.")
         return True

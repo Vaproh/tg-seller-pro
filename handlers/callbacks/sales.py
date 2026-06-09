@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller, get_user_role
 from core.state import state
-from core.format import _d, _truncate, esc
+from core.format import _d, _truncate, esc, code_id
 from core.keyboards import confirm_keyboard
 from core.filters import PAGE_SIZE
 from database import get_sale_by_id, count_sales, get_sales, get_seller_by_user_id, mark_payment, void_sale

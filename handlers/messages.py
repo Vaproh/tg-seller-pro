@@ -1,28 +1,24 @@
-import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller, require_admin
 from core.state import state
-from core.format import esc, _d, _truncate
+from core.format import esc, code, _d, _truncate
 from core.keyboards import category_keyboard, confirm_keyboard
 from core.filters import (
-    payment_status_keyboard, buyer_keyboard, parse_id_list,
-    apply_list_filters, count_from_filter, fmt_account_list_page,
+    payment_status_keyboard, parse_id_list,
+    apply_list_filters, fmt_account_list_page,
     filter_page_keyboard, PAGE_SIZE,
 )
 from database import (
-    add_account, add_accounts_bulk, get_account_by_id,
-    list_accounts, sell_account, get_category_name,
-    delete_account, delete_accounts_by_ids, get_buyer_names,
+    add_accounts_bulk, get_account_by_id,
+    get_category_name,
+    delete_accounts_by_ids,
 )
 from database.sales import update_sale, get_sale_by_id, create_draft_sale
 from database import get_seller_by_user_id
 from utils.parsers import parse_bulk_lines, parse_csv_file
-from utils.csv_utils import detect_columns, build_accounts_from_csv
 from utils.notifications import notify_admin, fmt_bulk_import
 import config
-
-logger = logging.getLogger(__name__)
 
 MAX_CSV_SIZE = 5 * 1024 * 1024
 
@@ -90,7 +86,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         state.set(user_id, "add_username", text)
         state.set(user_id, "add_stage", "password")
-        await update.message.reply_text(f"✅ Username: {esc(text)}\n🔑 Send the password:")
+        await update.message.reply_text(f"✅ Username: {code(text)}\n🔑 Send the password:")
         return
 
     if stage == "password":
@@ -113,7 +109,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         state.set(user_id, "add_email", text)
         state.set(user_id, "add_stage", "email_password")
-        await update.message.reply_text(f"✅ Email: {esc(text)}\n📧 Send email password (or /skip):")
+        await update.message.reply_text(f"✅ Email: {code(text)}\n📧 Send email password (or /skip):")
         return
 
     if stage == "email_password":
@@ -216,26 +212,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ── ID input for filters ───────────────────────────────
-    if state.get(user_id, "sell_ids_input"):
-        state.pop(user_id, "sell_ids_input")
-        ids = parse_id_list(text)
-        if not ids:
-            await update.message.reply_text("⚠️ No valid IDs. Enter comma-separated numbers:")
-            state.set(user_id, "sell_ids_input", True)
-            return
-        state.set(user_id, "sell_filter", f"ids:{','.join(str(i) for i in ids)}")
-        state.set(user_id, "sell_page", 1)
-        filter_str = state.get(user_id, "sell_filter")
-        accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
-        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-        text_msg = fmt_account_list_page(accounts, 1, total_pages, title="Available Accounts to Sell")
-        kb = filter_page_keyboard(
-            "sellfilter", 1, total_pages,
-            include_available=True, include_sold=False, include_pending=False,
-            include_all=False, include_ids=True,
-        )
-        await update.message.reply_text(text_msg, parse_mode="HTML", reply_markup=kb)
-        return
+    # (removed old sell_ids_input — /sell now uses select UI)
 
     if state.get(user_id, "list_ids_input"):
         state.pop(user_id, "list_ids_input")
@@ -265,7 +242,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ No valid IDs. Enter comma-separated numbers:")
             state.set(user_id, "del_ids_input", True)
             return
-        from database import delete_accounts_by_ids
         deleted = delete_accounts_by_ids(ids)
         await update.message.reply_text(f"✅ Deleted {deleted} account(s).")
         return
@@ -390,61 +366,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ── Bulk sell flow ─────────────────────────────────────
-    bulksell_stage = state.get(user_id, "bulksell_stage")
-    if bulksell_stage == "number":
-        try:
-            count = int(text)
-            if count <= 0:
-                raise ValueError
-        except ValueError:
-            await update.message.reply_text("⚠️ Enter a positive number:")
-            return
-        available = count_accounts(status="available")
-        if count > available:
-            await update.message.reply_text(f"⚠️ Only {available} available. Enter a smaller number:")
-            return
-        state.set(user_id, "bulksell_count", count)
-        state.set(user_id, "bulksell_stage", "buyer")
-        buyer_names = get_buyer_names()
-        if buyer_names:
-            kb = buyer_keyboard(buyer_names, "bulkbuypick")
-            await update.message.reply_text(
-                f"👤 {count} accounts will be sold.\nSelect buyer:",
-                reply_markup=kb,
-            )
-        else:
-            await update.message.reply_text(f"👤 {count} accounts will be sold.\nEnter buyer name:")
-        return
-
-    if bulksell_stage == "buyer":
-        if len(text) > config.MAX_BUYER_LEN:
-            await update.message.reply_text(f"⚠️ Buyer name too long (max {config.MAX_BUYER_LEN} chars).")
-            return
-        state.set(user_id, "bulksell_buyer", text)
-        state.set(user_id, "bulksell_stage", "price")
-        await update.message.reply_text("💰 Enter price per account (₹):")
-        return
-
-    if bulksell_stage == "price":
-        try:
-            price = float(text.replace("₹", "").replace(",", ""))
-        except ValueError:
-            await update.message.reply_text("⚠️ Enter a valid price:")
-            return
-        if price < 0:
-            await update.message.reply_text("⚠️ Price must be positive:")
-            return
-        state.set(user_id, "bulksell_price", price)
-        count = state.get(user_id, "bulksell_count")
-        accounts = list_accounts(limit=count, status="available")
-        selected = [a["id"] for a in accounts]
-        state.set(user_id, "bulksell_selected", selected)
-        state.set(user_id, "bulksell_stage", "payment")
-        await update.message.reply_text(
-            f"📦 Mark as:",
-            reply_markup=payment_status_keyboard("bulksellpaystatus"),
-        )
-        return
+    # (removed old bulksell_stage=="number" — /bulksell now uses same select UI as /sell)
 
 
 async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):

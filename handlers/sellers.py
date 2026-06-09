@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from core.permissions import require_admin
-from core.format import esc
+from core.format import esc, code_id
 from database import add_seller, remove_seller, list_sellers
 from utils.notifications import notify_admin, fmt_seller_added, fmt_seller_removed
 
@@ -39,7 +39,7 @@ async def removeseller_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     success = remove_seller(user_id)
     if success:
-        await update.message.reply_text(f"✅ Seller {user_id} removed.")
+        await update.message.reply_text(f"✅ Seller {code_id(user_id)} removed.")
         await notify_admin(context, fmt_seller_removed("—", user_id))
     else:
         await update.message.reply_text("🔍 Seller not found.")
@@ -56,7 +56,7 @@ async def listsellers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for s in sellers:
         status = "🟢" if s["active"] else "🔴"
         text += (
-            f"{status} {esc(s['name'])} (ID: {s['user_id']}) — "
+            f"{status} {esc(s['name'])} (ID: {code_id(s['user_id'])}) — "
             f"{s['sale_count']} sales, ₹{s['total_earnings']:.0f}\n"
         )
     await update.message.reply_text(text, parse_mode="HTML")

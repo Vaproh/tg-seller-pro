@@ -2,7 +2,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from core.permissions import require_admin
 from core.state import state
-from core.format import esc
+from core.format import esc, code, spoiler, code_id
 from core.keyboards import add_menu_keyboard, confirm_keyboard, yes_no_keyboard, category_keyboard
 from database import get_category_name
 from database.accounts import add_account
@@ -91,13 +91,13 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         cat_name = get_category_name(cat_id) or "—"
         preview = (
             f"<b>Confirm account:</b>\n\n"
-            f"👤 Username: {esc(username)}\n"
-            f"🔑 Password: <tg-spoiler>{esc(password)}</tg-spoiler>\n"
+            f"👤 Username: {code(username)}\n"
+            f"🔑 Password: {spoiler(password)}\n"
         )
         if email:
-            preview += f"📧 Email: {esc(email)}\n"
+            preview += f"📧 Email: {code(email)}\n"
         if email_password:
-            preview += f"🔑 Email Pass: <tg-spoiler>{esc(email_password)}</tg-spoiler>\n"
+            preview += f"🔑 Email Pass: {spoiler(email_password)}\n"
         preview += f"🔐 2FA: {'Yes' if has_2fa else 'No'}\n"
         preview += f"✅ Verified: {'Yes' if is_verified else 'No'}\n"
         if notes:
@@ -131,7 +131,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             has_2fa=has_2fa, is_verified=is_verified, notes=notes,
         )
         if success:
-            await query.edit_message_text(f"✅ Account saved! (ID: #{acc_id})")
+            await query.edit_message_text(f"✅ Account saved! (ID: #{code_id(acc_id)})")
         else:
             await query.edit_message_text(f"❌ {msg}")
         return True

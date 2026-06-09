@@ -1,30 +1,22 @@
-import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller, require_admin, get_user_role
 from core.state import state
-from core.format import esc, fmt_sale_block, fmt_receipt, _d, _truncate
-from core.keyboards import confirm_keyboard
+from core.format import esc, fmt_sale_block, _d, _truncate, code_id
+from core.keyboards import confirm_keyboard, sell_select_keyboard
 from core.filters import (
-    filter_page_keyboard, apply_list_filters, count_from_filter,
-    fmt_account_list_page, fmt_account_list_line,
-    buyer_keyboard, payment_status_keyboard, parse_filter_state,
-    build_filter_state, PAGE_SIZE,
+    apply_list_filters,
+    fmt_account_list_line,
+    sale_actions_keyboard,
+    PAGE_SIZE,
 )
 from database import (
-    sell_account, bulk_sell_accounts, mark_payment, get_sales, count_sales,
-    get_sale_by_id, void_sale, list_accounts, count_accounts,
-    get_seller_by_user_id, get_buyer_names, set_account_status,
+    sell_account, get_sales, count_sales,
+    get_sale_by_id, void_sale,
+    get_seller_by_user_id, set_account_status,
     get_account_by_id,
 )
-from database.sales import update_sale, create_draft_sale
-from utils.notifications import (
-    notify_admin, fmt_sale_notification, fmt_payment_notification,
-    fmt_high_value_notification, fmt_void_notification,
-)
-import config
-
-logger = logging.getLogger(__name__)
+from database.sales import create_draft_sale
 
 
 async def sell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -35,40 +27,16 @@ async def sell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not seller:
         await update.message.reply_text("⚠️ You are not registered as a seller.")
         return
-    state.set(user_id, "sell_filter", "status:available")
+    state.set(user_id, "sell_mode", "single")
+    state.set(user_id, "sell_selected", [])
     state.set(user_id, "sell_page", 1)
-    filter_str = "status:available"
-    accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
+    accounts, total = apply_list_filters("status:available", limit=PAGE_SIZE, offset=0)
     total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-    text = fmt_account_list_page(accounts, 1, total_pages, title="Available Accounts to Sell")
-    kb = filter_page_keyboard(
-        "sellfilter", 1, total_pages,
-        include_available=True, include_sold=False, include_pending=False,
-        include_all=False, include_ids=True,
-    )
+    text = f"<b>💰 Sell 1 Account — Tap to select</b>\n\n"
+    for acc in accounts:
+        text += fmt_account_list_line(acc) + "\n"
+    kb = sell_select_keyboard([], accounts, 1, total_pages, max_select=1)
     await update.message.reply_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
-
-
-async def sell_select_account(update: Update, context: ContextTypes.DEFAULT_TYPE, account_id):
-    user_id = update.effective_user.id
-    query = update.callback_query
-    account = get_account_by_id(account_id)
-    if not account or account["status"] != "available":
-        await query.edit_message_text("🔍 Account not found or not available.")
-        return
-    state.set(user_id, "sell_account_id", account_id)
-    buyer_names = get_buyer_names()
-    if buyer_names:
-        kb = buyer_keyboard(buyer_names, "buypick")
-        await query.edit_message_text(
-            f"💰 Selling: {_d(account)['username']}\n\n👤 Select buyer or type a new one:",
-            reply_markup=kb,
-        )
-    else:
-        state.set(user_id, "sell_stage", "buyer")
-        await query.edit_message_text(
-            f"💰 Selling: {_d(account)['username']}\n\n👤 Enter buyer name:"
-        )
 
 
 async def bulksell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -79,16 +47,16 @@ async def bulksell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not seller:
         await update.message.reply_text("⚠️ You are not registered as a seller.")
         return
-    kb = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("👆 Select accounts", callback_data="bulksellmode:select"),
-            InlineKeyboardButton("🔢 Enter number", callback_data="bulksellmode:number"),
-        ],
-    ])
-    await update.message.reply_text(
-        "💰 How would you like to bulk sell?",
-        reply_markup=kb,
-    )
+    state.set(user_id, "sell_mode", "bulk")
+    state.set(user_id, "sell_selected", [])
+    state.set(user_id, "sell_page", 1)
+    accounts, total = apply_list_filters("status:available", limit=PAGE_SIZE, offset=0)
+    total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    text = f"<b>💰 Bulk Sell — Tap to select accounts</b>\n\n"
+    for acc in accounts:
+        text += fmt_account_list_line(acc) + "\n"
+    kb = sell_select_keyboard([], accounts, 1, total_pages, max_select=None)
+    await update.message.reply_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
 
 
 async def sales_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -127,7 +95,6 @@ async def sale_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not sale:
         await update.message.reply_text("🔍 Sale not found.")
         return
-    from core.keyboards import sale_actions_keyboard
     await update.message.reply_text(
         fmt_sale_block(sale), parse_mode="HTML",
         reply_markup=sale_actions_keyboard(sale_id),
@@ -212,7 +179,7 @@ async def marksold_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         valid.append(account_id)
     parts = []
     if valid:
-        parts.append(f"🔴 Sold: {', '.join(str(i) for i in valid)}")
+        parts.append(f"🔴 Sold: {', '.join(code_id(i) for i in valid)}")
     if invalid:
         parts.append(f"⚠️ Not found: {', '.join(invalid)}")
     await update.message.reply_text("\n".join(parts))
@@ -241,7 +208,7 @@ async def markunsold_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         valid.append(account_id)
     parts = []
     if valid:
-        parts.append(f"🟢 Available: {', '.join(str(i) for i in valid)}")
+        parts.append(f"🟢 Available: {', '.join(code_id(i) for i in valid)}")
     if invalid:
         parts.append(f"⚠️ Not found: {', '.join(invalid)}")
     await update.message.reply_text("\n".join(parts))
@@ -270,7 +237,7 @@ async def markpendingpayment_cmd(update: Update, context: ContextTypes.DEFAULT_T
         valid.append(account_id)
     parts = []
     if valid:
-        parts.append(f"🟡 Pending: {', '.join(str(i) for i in valid)}")
+        parts.append(f"🟡 Pending: {', '.join(code_id(i) for i in valid)}")
     if invalid:
         parts.append(f"⚠️ Not found: {', '.join(invalid)}")
     await update.message.reply_text("\n".join(parts))

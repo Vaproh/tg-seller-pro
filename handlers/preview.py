@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller
 from core.state import state
-from core.format import esc, reddit_url, _d
+from core.format import esc, reddit_url, _d, code_id, code_username, code
 from core.keyboards import category_keyboard
 from database import get_available_accounts_for_category, list_accounts, get_category_name
 
@@ -62,12 +62,12 @@ async def handle_preview_count(update: Update, context: ContextTypes.DEFAULT_TYP
     for acc in accounts:
         a = _d(acc)
         text += (
-            f"• #{a.get('id', '')} | <code>{esc(a.get('username'))}</code>\n"
-            f"  🔗 {reddit_url(a.get('username', ''))}\n"
+            f"• {code_id(a.get('id', ''))} | {code_username(a.get('username'))}\n"
+            f"  🔗 {code(reddit_url(a.get('username', '')))}\n"
         )
         buttons.append([
             InlineKeyboardButton(
-                f"💰 Sell #{a['id']} ({esc(a['username'])})",
+                f"💰 Sell {code_id(a['id'])} ({code_username(a['username'])})",
                 callback_data=f"quicksell:{a['id']}",
             )
         ])
