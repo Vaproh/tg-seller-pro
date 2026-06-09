@@ -28,13 +28,18 @@ async def sell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not seller:
         await update.message.reply_text("⚠️ You are not registered as a seller.")
         return
-    kb = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("👆 Pick account", callback_data="sellmode:select"),
-            InlineKeyboardButton("🎲 Pick any", callback_data="sellmode:any"),
-        ],
-    ])
-    await update.message.reply_text("💰 Sell an account:", reply_markup=kb)
+    kb = category_keyboard("sellcat", include_all=True)
+    if not kb:
+        state.set(user_id, "sell_category", None)
+        kb2 = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("👆 Pick account", callback_data="sellmode:select"),
+                InlineKeyboardButton("🎲 Pick any", callback_data="sellmode:any"),
+            ],
+        ])
+        await update.message.reply_text("💰 Sell an account:", reply_markup=kb2)
+    else:
+        await update.message.reply_text("📂 Select category to sell from:", reply_markup=kb)
 
 
 async def bulksell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
