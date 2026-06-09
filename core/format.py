@@ -82,20 +82,23 @@ def fmt_sale_block(sale):
     sale_code = s.get("sale_code", f"#{s.get('id', '')}")
     username = s.get("username", "")
     email = s.get("email")
+    account_id = s.get("account_id", "")
     lines = [
-        f"╭─ {code(sale_code)} ────────────────",
+        f"╭─ 🧾 Sale {code(sale_code)} ─────────────",
+        f"│",
         f"│ 👤 Username: {code(username)}",
-        f"│ 💰 Price: {config.CURRENCY}{s.get('price', 0):.0f}",
-        f"│ 💳 Payment: {ps_emoji} {esc(ps)}",
-        f"│ 📅 Sold: {esc(str(s.get('sold_at', ''))[:16])}",
-        f"│ 👨‍💼 Seller: {esc(s.get('seller_name', '—'))}",
-        f"│ 🔗 Profile: {code(reddit_url(username))}",
-        f"│ 📂 Category: {esc(s.get('category_name', '—'))}",
+        f"│ 🔑 Password: {spoiler(s.get('password'))}",
     ]
     if email:
         lines.append(f"│ 📧 Email: {code(email)}")
-    if s.get("notes"):
-        lines.append(f"│ 📝 Notes: {esc(s['notes'])}")
+    lines.append(f"│ 🔗 Profile: {code(reddit_url(username))}")
+    lines.append(f"│")
+    lines.append(f"│ 👤 Buyer: {code(s.get('buyer_name'))}")
+    lines.append(f"│ 💰 Price: {config.CURRENCY}{s.get('price', 0):.0f}")
+    lines.append(f"│ 💳 Status: {ps_emoji} {esc(ps)}")
+    lines.append(f"│ 📅 Sold: {esc(str(s.get('sold_at', ''))[:10])}")
+    lines.append(f"│ 👨‍💼 Seller: {esc(s.get('seller_name', '—'))}")
+    lines.append(f"│ 🆔 Account ID: {code(account_id)}")
     lines.append("╰──────────────────────────")
     return "\n".join(lines)
 
@@ -104,22 +107,31 @@ def fmt_receipt(sale):
     s = _d(sale)
     username = str(s.get("username", ""))
     password = str(s.get("password", ""))
+    email = s.get("email")
+    email_pass = s.get("email_password")
     price = s.get("price", 0)
     sale_code = s.get("sale_code", f"#{s.get('id', '')}")
     sold_at = str(s.get("sold_at", ""))[:10]
     ps = s.get("payment_status", "pending")
-    ps_label = "Pending Payment" if ps == "pending" else "Paid"
-    return (
-        "╔══════════════════════════════════╗\n"
-        "║     🧾 Reddit Account Receipt    ║\n"
-        "╠══════════════════════════════════╣\n"
-        f"║ Account: {code(username)}\n"
-        f"║ Password: {spoiler(password)}\n"
-        f"║ Profile: {code(reddit_url(username))}\n"
-        "║──────────────────────────────────║\n"
-        f"║ Price: {config.CURRENCY}{price:.0f}\n"
-        f"║ Status: {ps_label}\n"
-        f"║ {code(sale_code)}\n"
-        f"║ Date: {sold_at}\n"
-        "╚══════════════════════════════════╝"
-    )
+    ps_emoji = "✅" if ps == "paid" else "🟡" if ps == "pending" else "⚪"
+    account_id = s.get("account_id", "")
+    lines = [
+        f"╭─ 🧾 Receipt {code(sale_code)} ────────────",
+        f"│",
+        f"│ 👤 Username: {code(username)}",
+        f"│ 🔑 Password: {spoiler(password)}",
+    ]
+    if email:
+        lines.append(f"│ 📧 Email: {code(email)}")
+    if email_pass:
+        lines.append(f"│ 🔑 Email Pass: {spoiler(email_pass)}")
+    lines.append(f"│ 🔐 2FA: {'Yes' if s.get('has_2fa') else 'No'}")
+    lines.append(f"│ ✅ Verified: {'Yes' if s.get('is_verified') else 'No'}")
+    lines.append(f"│ 🔗 Profile: {code(reddit_url(username))}")
+    lines.append(f"│")
+    lines.append(f"│ 💰 Price: {config.CURRENCY}{price:.0f}")
+    lines.append(f"│ 💳 Status: {ps_emoji} {esc(ps)}")
+    lines.append(f"│ 📅 Date: {sold_at}")
+    lines.append(f"│ 🆔 Account ID: {code(account_id)}")
+    lines.append("╰──────────────────────────")
+    return "\n".join(lines)
