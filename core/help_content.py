@@ -419,6 +419,23 @@ Shows money made in a time range.
 Type /report
 Pick: Today / This Week / This Month / All Time""",
 
+    "stats": """<b>📊 /stats — Revenue Stats & Charts</b>
+
+<b>What it does:</b>
+Shows revenue stats and generates charts.
+
+<b>How to use:</b>
+1. Type /stats (or /stats today, /stats week, /stats month)
+2. Pick a period: Today / This Week / This Month / All Time
+3. Tap 📊 Charts to generate image charts
+
+<b>Charts include:</b>
+📈 Revenue over time
+📂 Revenue by category
+💳 Payment status breakdown
+🏆 Top buyers
+👨‍💼 Top sellers (admin only)""",
+
     "addseller": """<b>👤 /addseller — Add Team Member</b>
 
 <b>What it does:</b>
