@@ -82,18 +82,14 @@ async def sale_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not args:
         await update.message.reply_text("📝 Usage: /sale <sale_id>")
         return
-    try:
-        sale_id = int(args[0])
-    except ValueError:
-        await update.message.reply_text("⚠️ Invalid sale ID.")
-        return
-    sale = get_sale_by_id(sale_id)
+    sale = get_sale_by_id(args[0])
     if not sale:
         await update.message.reply_text("🔍 Sale not found.")
         return
+    sd = _d(sale)
     await update.message.reply_text(
         fmt_sale_block(sale), parse_mode="HTML",
-        reply_markup=sale_actions_keyboard(sale_id),
+        reply_markup=sale_actions_keyboard(sd.get("id")),
     )
 
 
@@ -252,8 +248,9 @@ def _fmt_sales_page(sales, page, total_pages, summary=None):
         sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
         date = str(sd.get("sold_at", ""))[:10]
         cat = sd.get("category_name", "—")
+        acct_id = sd.get("account_id", "")
         text += (
-            f"• {code(sale_code)} | {esc(sd.get('buyer_name'))} | "
+            f"• {code(sale_code)} | Acct {code_id(acct_id)} | {esc(sd.get('buyer_name'))} | "
             f"{config.CURRENCY}{sd.get('price', 0):.0f} | {ps_emoji} | "
             f"{esc(cat)} | {date}\n"
         )

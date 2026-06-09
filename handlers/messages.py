@@ -26,7 +26,7 @@ MAX_CSV_SIZE = 5 * 1024 * 1024
 async def _editsale_process_ids_text(update, context, text):
     user_id = update.effective_user.id
     mode = state.get(user_id, "editsale_mode")
-    state.pop(user_id, "editsale_mode")
+    state.pop(user_id, "editsale_mode", None)
     ids = [x.strip() for x in text.split(",") if x.strip()]
     seller = get_seller_by_user_id(user_id)
     seller_id = seller["id"] if seller else None
@@ -40,7 +40,11 @@ async def _editsale_process_ids_text(update, context, text):
                 valid_sales.append(_d(sale))
             else:
                 invalid_ids.append(id_str)
-        else:
+        elif mode == "account":
+            sale = get_sale_by_id(id_str)
+            if sale:
+                valid_sales.append(_d(sale))
+                continue
             try:
                 account_id = int(id_str)
             except ValueError:
@@ -61,6 +65,31 @@ async def _editsale_process_ids_text(update, context, text):
                     invalid_ids.append(id_str)
             else:
                 invalid_ids.append(id_str)
+        else:
+            sale = get_sale_by_id(id_str)
+            if sale:
+                valid_sales.append(_d(sale))
+            else:
+                try:
+                    account_id = int(id_str)
+                except ValueError:
+                    invalid_ids.append(id_str)
+                    continue
+                account = get_account_by_id(account_id)
+                if account and _d(account).get("status") in ("sold", "pending_payment"):
+                    draft_id = create_draft_sale(account_id, seller_id)
+                    if draft_id:
+                        sale = get_sale_by_id(draft_id)
+                        if sale:
+                            sd = _d(sale)
+                            valid_sales.append(sd)
+                            created_drafts.append((id_str, sd.get("sale_code", f"#{draft_id}")))
+                        else:
+                            invalid_ids.append(id_str)
+                    else:
+                        invalid_ids.append(id_str)
+                else:
+                    invalid_ids.append(id_str)
     if not valid_sales:
         await update.message.reply_text(f"⚠️ Not found: {', '.join(code(i) for i in invalid_ids)}")
         return
