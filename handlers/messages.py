@@ -5,13 +5,13 @@ from core.state import state
 from core.format import esc, code, _d, _truncate
 from core.keyboards import category_keyboard, confirm_keyboard
 from core.filters import (
-    payment_status_keyboard, parse_id_list,
+    payment_status_keyboard, buyer_keyboard, parse_id_list,
     apply_list_filters, fmt_account_list_page,
     filter_page_keyboard, PAGE_SIZE,
 )
 from database import (
     add_accounts_bulk, get_account_by_id,
-    get_category_name,
+    get_category_name, get_buyer_names,
     delete_accounts_by_ids,
 )
 from database.sales import update_sale, get_sale_by_id, create_draft_sale
@@ -248,6 +248,36 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Sell flow ──────────────────────────────────────────
     sell_stage = state.get(user_id, "sell_stage")
+    if sell_stage == "number":
+        try:
+            count = int(text)
+            if count <= 0:
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("⚠️ Enter a positive number:")
+            return
+        from database import count_accounts
+        available = count_accounts(status="available")
+        if count > available:
+            await update.message.reply_text(f"⚠️ Only {available} available. Enter a smaller number:")
+            return
+        accounts, _ = apply_list_filters("status:available", limit=count, offset=0)
+        selected = [dict(a)["id"] for a in accounts]
+        state.set(user_id, "sell_selected", selected)
+        if not state.get(user_id, "sell_mode"):
+            state.set(user_id, "sell_mode", "single")
+        state.set(user_id, "sell_stage", "buyer")
+        buyer_names = get_buyer_names()
+        if buyer_names:
+            kb = buyer_keyboard(buyer_names, "buypick")
+            await update.message.reply_text(
+                f"👤 {count} account(s) selected.\nSelect buyer:",
+                reply_markup=kb,
+            )
+        else:
+            await update.message.reply_text(f"👤 {count} account(s) selected.\nEnter buyer name:")
+        return
+
     if sell_stage == "buyer":
         if len(text) > config.MAX_BUYER_LEN:
             await update.message.reply_text(f"⚠️ Buyer name too long (max {config.MAX_BUYER_LEN} chars).")
@@ -330,10 +360,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             value = None if text.lower() == "/clear" else text
         else:
             return
+        field_key = "buyer_name" if editsale_field == "buyer" else editsale_field
         for sid in sale_ids:
             if sid not in pending:
                 pending[sid] = {}
-            pending[sid][editsale_field] = value
+            pending[sid][field_key] = value
         state.set(user_id, "editsale_pending", pending)
         state.pop(user_id, "editsale_field")
         from handlers.sell import _editsale_summary_with_pending, _editsale_field_keyboard

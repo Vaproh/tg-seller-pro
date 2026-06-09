@@ -27,16 +27,13 @@ async def sell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not seller:
         await update.message.reply_text("⚠️ You are not registered as a seller.")
         return
-    state.set(user_id, "sell_mode", "single")
-    state.set(user_id, "sell_selected", [])
-    state.set(user_id, "sell_page", 1)
-    accounts, total = apply_list_filters("status:available", limit=PAGE_SIZE, offset=0)
-    total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-    text = f"<b>💰 Sell 1 Account — Tap to select</b>\n\n"
-    for acc in accounts:
-        text += fmt_account_list_line(acc) + "\n"
-    kb = sell_select_keyboard([], accounts, 1, total_pages, max_select=1)
-    await update.message.reply_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+    kb = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("👆 Select account", callback_data="sellmode:select"),
+            InlineKeyboardButton("🔢 Enter number", callback_data="sellmode:number"),
+        ],
+    ])
+    await update.message.reply_text("💰 How would you like to sell?", reply_markup=kb)
 
 
 async def bulksell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -47,16 +44,13 @@ async def bulksell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not seller:
         await update.message.reply_text("⚠️ You are not registered as a seller.")
         return
-    state.set(user_id, "sell_mode", "bulk")
-    state.set(user_id, "sell_selected", [])
-    state.set(user_id, "sell_page", 1)
-    accounts, total = apply_list_filters("status:available", limit=PAGE_SIZE, offset=0)
-    total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-    text = f"<b>💰 Bulk Sell — Tap to select accounts</b>\n\n"
-    for acc in accounts:
-        text += fmt_account_list_line(acc) + "\n"
-    kb = sell_select_keyboard([], accounts, 1, total_pages, max_select=None)
-    await update.message.reply_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+    kb = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("👆 Select accounts", callback_data="bulksellmode:select"),
+            InlineKeyboardButton("🔢 Enter number", callback_data="bulksellmode:number"),
+        ],
+    ])
+    await update.message.reply_text("💰 How would you like to bulk sell?", reply_markup=kb)
 
 
 async def sales_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):

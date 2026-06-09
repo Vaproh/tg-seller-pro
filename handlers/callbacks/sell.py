@@ -1,4 +1,4 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller
 from core.state import state
@@ -39,16 +39,62 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         if not seller:
             await query.edit_message_text("⚠️ You are not registered as a seller.")
             return True
-        state.set(user_id, "sell_mode", "single")
-        state.set(user_id, "sell_selected", [])
-        state.set(user_id, "sell_page", 1)
-        accounts, total = apply_list_filters("status:available", limit=PAGE_SIZE, offset=0)
-        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-        text = f"<b>💰 Sell 1 Account — Tap to select</b>\n\n"
-        for acc in accounts:
-            text += fmt_account_list_line(acc) + "\n"
-        kb = sell_select_keyboard([], accounts, 1, total_pages, max_select=1)
-        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        kb = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("👆 Select account", callback_data="sellmode:select"),
+                InlineKeyboardButton("🔢 Enter number", callback_data="sellmode:number"),
+            ],
+        ])
+        await query.edit_message_text("💰 How would you like to sell?", reply_markup=kb)
+        return True
+
+    if data.startswith("sellmode:"):
+        if not await require_seller(update):
+            return True
+        mode = data.split(":", 1)[1]
+        if mode == "select":
+            state.set(user_id, "sell_mode", "single")
+            state.set(user_id, "sell_selected", [])
+            state.set(user_id, "sell_page", 1)
+            accounts, total = apply_list_filters("status:available", limit=PAGE_SIZE, offset=0)
+            total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+            text = f"<b>💰 Sell 1 Account — Tap to select</b>\n\n"
+            for acc in accounts:
+                text += fmt_account_list_line(acc) + "\n"
+            kb = sell_select_keyboard([], accounts, 1, total_pages, max_select=1)
+            await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        elif mode == "number":
+            from database import count_accounts
+            available = count_accounts(status="available")
+            state.set(user_id, "sell_stage", "number")
+            await query.edit_message_text(
+                f"🔢 How many accounts to sell? (available: {available})"
+            )
+        return True
+
+    if data.startswith("bulksellmode:"):
+        if not await require_seller(update):
+            return True
+        mode = data.split(":", 1)[1]
+        if mode == "select":
+            state.set(user_id, "sell_mode", "bulk")
+            state.set(user_id, "sell_selected", [])
+            state.set(user_id, "sell_page", 1)
+            accounts, total = apply_list_filters("status:available", limit=PAGE_SIZE, offset=0)
+            total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+            text = f"<b>💰 Bulk Sell — Tap to select accounts</b>\n\n"
+            for acc in accounts:
+                text += fmt_account_list_line(acc) + "\n"
+            kb = sell_select_keyboard([], accounts, 1, total_pages, max_select=None)
+            await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        elif mode == "number":
+            from database import count_accounts
+            available = count_accounts(status="available")
+            state.set(user_id, "sell_mode", "bulk")
+            state.set(user_id, "sell_stage", "number")
+            await query.edit_message_text(
+                f"🔢 How many accounts to sell? (available: {available})"
+            )
         return True
 
     if data.startswith("selltoggle:"):
