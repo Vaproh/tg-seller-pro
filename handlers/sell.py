@@ -175,88 +175,121 @@ async def voidsale_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def marksold_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_seller(update):
         return
+    user_id = update.effective_user.id
+    role = get_user_role(user_id)
+    seller = get_seller_by_user_id(user_id) if role != "admin" else None
+    seller_id = seller["id"] if seller else None
     args = context.args
-    if not args:
-        await update.message.reply_text("📝 Usage: /marksold <id,id,...>")
+    if args:
+        ids = [x.strip() for x in args[0].split(",") if x.strip()]
+        results = []
+        for id_str in ids:
+            sale = get_sale_by_id(id_str)
+            if not sale:
+                results.append(f"⚠️ Not found: {code(id_str)}")
+                continue
+            sd = _d(sale)
+            sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
+            mark_payment(sd.get("id"), "paid")
+            results.append(f"✅ {code(sale_code)} → 🔴 sold")
+        await update.message.reply_text("\n".join(results))
         return
-    ids = [x.strip() for x in args[0].split(",") if x.strip()]
-    valid, invalid = [], []
-    for id_str in ids:
-        try:
-            account_id = int(id_str)
-        except ValueError:
-            invalid.append(id_str)
-            continue
-        account = get_account_by_id(account_id)
-        if not account:
-            invalid.append(id_str)
-            continue
-        set_account_status(account_id, "sold")
-        valid.append(account_id)
-    parts = []
-    if valid:
-        parts.append(f"🔴 Sold: {', '.join(code_id(i) for i in valid)}")
-    if invalid:
-        parts.append(f"⚠️ Not found: {', '.join(code(i) for i in invalid)}")
-    await update.message.reply_text("\n".join(parts))
+    pending = get_sales(limit=50, seller_id=seller_id, status="pending")
+    if not pending:
+        await update.message.reply_text("📭 No pending sales to mark as sold.")
+        return
+    buttons = []
+    for s in pending:
+        sd = _d(s)
+        sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
+        buttons.append([
+            InlineKeyboardButton(
+                f"{esc(sale_code)} | {esc(sd.get('buyer_name'))} | ₹{sd.get('price', 0):.0f}",
+                callback_data=f"marksold:{sd.get('id')}",
+            )
+        ])
+    kb = InlineKeyboardMarkup(buttons)
+    await update.message.reply_text("🔴 Select a sale to mark as sold:", reply_markup=kb)
 
 
 async def markunsold_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_seller(update):
         return
+    user_id = update.effective_user.id
+    role = get_user_role(user_id)
+    seller = get_seller_by_user_id(user_id) if role != "admin" else None
+    seller_id = seller["id"] if seller else None
     args = context.args
-    if not args:
-        await update.message.reply_text("📝 Usage: /markunsold <id,id,...>")
+    if args:
+        ids = [x.strip() for x in args[0].split(",") if x.strip()]
+        results = []
+        for id_str in ids:
+            sale = get_sale_by_id(id_str)
+            if not sale:
+                results.append(f"⚠️ Not found: {code(id_str)}")
+                continue
+            sd = _d(sale)
+            sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
+            void_sale(sd.get("id"))
+            results.append(f"✅ {code(sale_code)} → 🟢 available")
+        await update.message.reply_text("\n".join(results))
         return
-    ids = [x.strip() for x in args[0].split(",") if x.strip()]
-    valid, invalid = [], []
-    for id_str in ids:
-        try:
-            account_id = int(id_str)
-        except ValueError:
-            invalid.append(id_str)
-            continue
-        account = get_account_by_id(account_id)
-        if not account:
-            invalid.append(id_str)
-            continue
-        set_account_status(account_id, "available")
-        valid.append(account_id)
-    parts = []
-    if valid:
-        parts.append(f"🟢 Available: {', '.join(code_id(i) for i in valid)}")
-    if invalid:
-        parts.append(f"⚠️ Not found: {', '.join(code(i) for i in invalid)}")
-    await update.message.reply_text("\n".join(parts))
+    sold = get_sales(limit=50, seller_id=seller_id, status="paid")
+    if not sold:
+        await update.message.reply_text("📭 No sold sales to mark as unsold.")
+        return
+    buttons = []
+    for s in sold:
+        sd = _d(s)
+        sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
+        buttons.append([
+            InlineKeyboardButton(
+                f"{esc(sale_code)} | {esc(sd.get('buyer_name'))} | ₹{sd.get('price', 0):.0f}",
+                callback_data=f"marksaleunsold:{sd.get('id')}",
+            )
+        ])
+    kb = InlineKeyboardMarkup(buttons)
+    await update.message.reply_text("🟢 Select a sale to void (return to stock):", reply_markup=kb)
 
 
 async def markpendingpayment_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_seller(update):
         return
+    user_id = update.effective_user.id
+    role = get_user_role(user_id)
+    seller = get_seller_by_user_id(user_id) if role != "admin" else None
+    seller_id = seller["id"] if seller else None
     args = context.args
-    if not args:
-        await update.message.reply_text("📝 Usage: /markpendingpayment <id,id,...>")
+    if args:
+        ids = [x.strip() for x in args[0].split(",") if x.strip()]
+        results = []
+        for id_str in ids:
+            sale = get_sale_by_id(id_str)
+            if not sale:
+                results.append(f"⚠️ Not found: {code(id_str)}")
+                continue
+            sd = _d(sale)
+            sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
+            mark_payment(sd.get("id"), "pending")
+            results.append(f"✅ {code(sale_code)} → 🟡 pending payment")
+        await update.message.reply_text("\n".join(results))
         return
-    ids = [x.strip() for x in args[0].split(",") if x.strip()]
-    valid, invalid = [], []
-    for id_str in ids:
-        try:
-            account_id = int(id_str)
-        except ValueError:
-            invalid.append(id_str)
-            continue
-        account = get_account_by_id(account_id)
-        if not account:
-            invalid.append(id_str)
-            continue
-        set_account_status(account_id, "pending_payment")
-        valid.append(account_id)
-    parts = []
-    if valid:
-        parts.append(f"🟡 Pending: {', '.join(code_id(i) for i in valid)}")
-    if invalid:
-        parts.append(f"⚠️ Not found: {', '.join(code(i) for i in invalid)}")
-    await update.message.reply_text("\n".join(parts))
+    paid = get_sales(limit=50, seller_id=seller_id, status="paid")
+    if not paid:
+        await update.message.reply_text("📭 No paid sales to mark as pending.")
+        return
+    buttons = []
+    for s in paid:
+        sd = _d(s)
+        sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
+        buttons.append([
+            InlineKeyboardButton(
+                f"{esc(sale_code)} | {esc(sd.get('buyer_name'))} | ₹{sd.get('price', 0):.0f}",
+                callback_data=f"marksalepending:{sd.get('id')}",
+            )
+        ])
+    kb = InlineKeyboardMarkup(buttons)
+    await update.message.reply_text("🟡 Select a sale to mark as pending payment:", reply_markup=kb)
 
 
 def _fmt_sales_page(sales, page, total_pages, summary=None):

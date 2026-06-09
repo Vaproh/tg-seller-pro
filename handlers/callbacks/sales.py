@@ -98,11 +98,32 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             return True
         new_status = "paid" if _d(sale).get("payment_status") == "pending" else "pending"
         mark_payment(sale_id, new_status)
-        label = "paid" if new_status == "paid" else "pending"
+        label = "paid ✅" if new_status == "paid" else "🟡 pending"
         sale_code = _d(sale).get("sale_code", f"#{sale_id}")
-        await query.edit_message_text(f"✅ {code(sale_code)} marked as {label}.")
+        await query.edit_message_text(f"✅ {code(sale_code)} → {label}.")
         if new_status == "paid":
             await notify_admin(context, f"✅ Payment received! {code(sale_code)} — ₹{_d(sale).get('price', 0):.0f} from {_d(sale).get('buyer_name')}")
+        return True
+
+    if data.startswith("marksold:"):
+        if not await require_seller(update):
+            return True
+        try:
+            sale_id = int(data.split(":")[1])
+        except ValueError:
+            return True
+        sale = get_sale_by_id(sale_id)
+        if not sale:
+            await query.edit_message_text("🔍 Sale not found.")
+            return True
+        sd = _d(sale)
+        role = get_user_role(user_id)
+        if role != "admin" and sd.get("seller_user_id") != user_id:
+            await query.edit_message_text("⚠️ You can only modify your own sales.")
+            return True
+        mark_payment(sale_id, "paid")
+        sale_code = sd.get("sale_code", f"#{sale_id}")
+        await query.edit_message_text(f"✅ {code(sale_code)} → 🔴 sold.")
         return True
 
     if data.startswith("marksaleunsold:"):
@@ -162,9 +183,14 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         if not sale:
             await query.edit_message_text("🔍 Sale not found.")
             return True
+        sd = _d(sale)
+        role = get_user_role(user_id)
+        if role != "admin" and sd.get("seller_user_id") != user_id:
+            await query.edit_message_text("⚠️ You can only modify your own sales.")
+            return True
         mark_payment(sale_id, "pending")
-        sale_code = _d(sale).get("sale_code", f"#{sale_id}")
-        await query.edit_message_text(f"✅ {code(sale_code)} marked as 🟡 pending payment.")
+        sale_code = sd.get("sale_code", f"#{sale_id}")
+        await query.edit_message_text(f"✅ {code(sale_code)} → 🟡 pending payment.")
         return True
 
     if data.startswith("voidconfirm:"):
