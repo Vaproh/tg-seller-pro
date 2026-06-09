@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_admin
 from core.state import state
-from core.format import esc, _truncate
+from core.format import esc, code, spoiler, _truncate
 from core.keyboards import confirm_keyboard, category_keyboard
 from database import get_category_name, add_accounts_bulk
 from utils.csv_utils import build_accounts_from_csv
@@ -45,7 +45,7 @@ async def _csv_show_preview(update, context, user_id, query):
     text = f"<b>CSV Preview ({len(accounts)} accounts):</b>\n\n"
     text += "<b>Mapping:</b> " + " | ".join(map_desc) + "\n\n"
     for acc in preview:
-        text += f"• {esc(acc.get('username', ''))} | {esc(str(acc.get('password', ''))[:4])}***"
+        text += f"• {code(acc.get('username', ''))} | {spoiler(str(acc.get('password', ''))[:4])}***"
         if acc.get("email"):
             text += f" | {esc(acc['email'])}"
         text += "\n"

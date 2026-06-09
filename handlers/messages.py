@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller, require_admin
 from core.state import state
-from core.format import esc, code, _d, _truncate
+from core.format import esc, code, code_id, _d, _truncate
 from core.keyboards import category_keyboard, confirm_keyboard
 from core.filters import (
     payment_status_keyboard, parse_id_list,
@@ -62,7 +62,7 @@ async def _editsale_process_ids_text(update, context, text):
             else:
                 invalid_ids.append(id_str)
     if not valid_sales:
-        await update.message.reply_text(f"⚠️ Not found: {', '.join(invalid_ids)}")
+        await update.message.reply_text(f"⚠️ Not found: {', '.join(code(i) for i in invalid_ids)}")
         return
     state.set(user_id, "editsale_ids", [s["id"] for s in valid_sales])
     state.set(user_id, "editsale_pending", {})
@@ -172,7 +172,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             state.pop(user_id, "bulk_stage")
             state.pop(user_id, "bulk_lines")
             state.pop(user_id, "bulk_category")
-            msg = f"📥 Bulk import: {result['added']} added, {result['skipped']} skipped in {cat_name}"
+            msg = f"📥 Bulk import: {result['added']} added, {result['skipped']} skipped in {code(cat_name)}"
             await update.message.reply_text(msg)
             await notify_admin(context, fmt_bulk_import(result["added"], result["skipped"], cat_name))
             return
@@ -303,11 +303,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 failed.append(sid)
         parts = []
         if updated:
-            detail = ", ".join(f"#{i}" for i in updated)
+            detail = ", ".join(code_id(i) for i in updated)
             field_names = ", ".join(fields.keys())
             parts.append(f"✏️ Updated {detail}: {field_names}")
         if failed:
-            parts.append(f"⚠️ Failed: {', '.join(str(i) for i in failed)}")
+            parts.append(f"⚠️ Failed: {', '.join(code(i) for i in failed)}")
         await update.message.reply_text("\n".join(parts))
         return
 

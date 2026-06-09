@@ -81,7 +81,7 @@ def fmt_sale_block(sale):
     ps_emoji = "✅" if ps == "paid" else "🟡" if ps == "pending" else "⚪"
     sale_code = s.get("sale_code", f"#{s.get('id', '')}")
     lines = [
-        f"╭─ <b>{sale_code}</b> ────────────────",
+        f"╭─ {code(sale_code)} ────────────────",
         f"│ 👤 Buyer: {code(s.get('buyer_name'))}",
         f"│ 💰 Price: {config.CURRENCY}{s.get('price', 0):.0f}",
         f"│ 💳 Payment: {ps_emoji} {esc(ps)}",
@@ -115,7 +115,7 @@ def fmt_receipt(sale):
         "║──────────────────────────────────║\n"
         f"║ Price: {config.CURRENCY}{price:.0f}\n"
         f"║ Status: {ps_label}\n"
-        f"║ <b>{sale_code}</b>\n"
+        f"║ {code(sale_code)}\n"
         f"║ Date: {sold_at}\n"
         "╚══════════════════════════════════╝"
     )

@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller, get_user_role
 from core.state import state
-from core.format import _d, _truncate, esc, code_id
+from core.format import _d, _truncate, esc, code, code_id
 from core.keyboards import confirm_keyboard
 from core.filters import PAGE_SIZE
 from database import get_sale_by_id, count_sales, get_sales, get_seller_by_user_id, mark_payment, void_sale
@@ -97,9 +97,9 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         mark_payment(sale_id, new_status)
         label = "paid" if new_status == "paid" else "pending"
         sale_code = _d(sale).get("sale_code", f"#{sale_id}")
-        await query.edit_message_text(f"✅ {sale_code} marked as {label}.")
+        await query.edit_message_text(f"✅ {code(sale_code)} marked as {label}.")
         if new_status == "paid":
-            await notify_admin(context, f"✅ Payment received! {sale_code} — ₹{_d(sale).get('price', 0):.0f} from {_d(sale).get('buyer_name')}")
+            await notify_admin(context, f"✅ Payment received! {code(sale_code)} — ₹{_d(sale).get('price', 0):.0f} from {_d(sale).get('buyer_name')}")
         return True
 
     if data.startswith("marksaleunsold:"):
@@ -120,7 +120,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             return True
         state.set(user_id, "void_confirm", sale_id)
         await query.edit_message_text(
-            f"⚠️ Void sale #{sale_id}? Account will return to available stock.",
+            f"⚠️ Void sale {code_id(sale_id)}? Account will return to available stock.",
             reply_markup=confirm_keyboard(f"voidconfirm:{sale_id}", "voidcancel"),
         )
         return True
@@ -143,7 +143,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             return True
         state.set(user_id, "void_confirm", sale_id)
         await query.edit_message_text(
-            f"⚠️ Void sale #{sale_id}? Account will return to available stock.",
+            f"⚠️ Void sale {code_id(sale_id)}? Account will return to available stock.",
             reply_markup=confirm_keyboard(f"voidconfirm:{sale_id}", "voidcancel"),
         )
         return True
@@ -161,7 +161,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             return True
         mark_payment(sale_id, "pending")
         sale_code = _d(sale).get("sale_code", f"#{sale_id}")
-        await query.edit_message_text(f"✅ {sale_code} marked as 🟡 pending payment.")
+        await query.edit_message_text(f"✅ {code(sale_code)} marked as 🟡 pending payment.")
         return True
 
     if data.startswith("voidconfirm:"):
@@ -176,7 +176,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         sale_code = _d(sale).get("sale_code", f"#{sale_id}") if sale else f"#{sale_id}"
         success = void_sale(sale_id)
         if success:
-            await query.edit_message_text(f"✅ {sale_code} voided. Account returned to available stock.")
+            await query.edit_message_text(f"✅ {code(sale_code)} voided. Account returned to available stock.")
             await notify_admin(context, fmt_void_notification(sale_code))
         else:
             await query.edit_message_text("❌ Failed to void sale.")
@@ -234,7 +234,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             text += "\n\n<b>Pending changes:</b>\n"
             for sid, fields in pending.items():
                 parts = ", ".join(f"{k}={v}" for k, v in fields.items())
-                text += f"• #{sid}: {parts}\n"
+                text += f"• {code_id(sid)}: {parts}\n"
         kb = _editsale_field_keyboard()
         await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
         return True
@@ -289,9 +289,9 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             if len(updated) > 1:
                 parts.append(f"✏️ Updated {len(updated)} sales: {', '.join(field_names)}")
             else:
-                parts.append(f"✏️ Updated {sale_code}: {', '.join(field_names)}")
+                parts.append(f"✏️ Updated {code(sale_code)}: {', '.join(field_names)}")
         if failed:
-            parts.append(f"⚠️ Failed: {', '.join(str(i) for i in failed)}")
+            parts.append(f"⚠️ Failed: {', '.join(code(i) for i in failed)}")
         await query.edit_message_text("\n".join(parts))
         return True
 

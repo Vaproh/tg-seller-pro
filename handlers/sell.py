@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller, require_admin, get_user_role
 from core.state import state
-from core.format import esc, fmt_sale_block, _d, _truncate, code_id
+from core.format import esc, code, code_id, fmt_sale_block, _d, _truncate
 from core.keyboards import confirm_keyboard, sell_select_keyboard
 from core.filters import (
     apply_list_filters,
@@ -112,7 +112,7 @@ async def markpaid_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
         buttons.append([
             InlineKeyboardButton(
-                f"{sale_code} | {sd.get('buyer_name')} | ₹{sd.get('price', 0):.0f}",
+                f"{esc(sale_code)} | {esc(sd.get('buyer_name'))} | ₹{sd.get('price', 0):.0f}",
                 callback_data=f"markpaid:{sd.get('id')}",
             )
         ])
@@ -144,9 +144,9 @@ async def voidsale_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         valid.append(sale_code)
     parts = []
     if valid:
-        parts.append(f"♻️ Voided: {', '.join(valid)}")
+        parts.append(f"♻️ Voided: {', '.join(code(s) for s in valid)}")
     if invalid:
-        parts.append(f"⚠️ Not found: {', '.join(invalid)}")
+        parts.append(f"⚠️ Not found: {', '.join(code(i) for i in invalid)}")
     await update.message.reply_text("\n".join(parts))
 
 
@@ -175,7 +175,7 @@ async def marksold_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if valid:
         parts.append(f"🔴 Sold: {', '.join(code_id(i) for i in valid)}")
     if invalid:
-        parts.append(f"⚠️ Not found: {', '.join(invalid)}")
+        parts.append(f"⚠️ Not found: {', '.join(code(i) for i in invalid)}")
     await update.message.reply_text("\n".join(parts))
 
 
@@ -204,7 +204,7 @@ async def markunsold_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if valid:
         parts.append(f"🟢 Available: {', '.join(code_id(i) for i in valid)}")
     if invalid:
-        parts.append(f"⚠️ Not found: {', '.join(invalid)}")
+        parts.append(f"⚠️ Not found: {', '.join(code(i) for i in invalid)}")
     await update.message.reply_text("\n".join(parts))
 
 
@@ -233,7 +233,7 @@ async def markpendingpayment_cmd(update: Update, context: ContextTypes.DEFAULT_T
     if valid:
         parts.append(f"🟡 Pending: {', '.join(code_id(i) for i in valid)}")
     if invalid:
-        parts.append(f"⚠️ Not found: {', '.join(invalid)}")
+        parts.append(f"⚠️ Not found: {', '.join(code(i) for i in invalid)}")
     await update.message.reply_text("\n".join(parts))
 
 
@@ -245,7 +245,7 @@ def _fmt_sales_page(sales, page, total_pages):
         ps_emoji = "✅" if ps == "paid" else "🟡" if ps == "pending" else "⚪"
         sale_code = sd.get("sale_code", f"#{sd.get('id', '')}")
         text += (
-            f"• <b>{sale_code}</b> | {esc(sd.get('buyer_name'))} | "
+            f"• {code(sale_code)} | {esc(sd.get('buyer_name'))} | "
             f"₹{sd.get('price', 0):.0f} | {ps_emoji} {esc(ps)} | "
             f"{esc(sd.get('seller_name', '—'))}\n"
         )
@@ -327,7 +327,7 @@ async def _editsale_process_ids(update, context, raw_input):
         else:
             invalid_ids.append(id_str)
     if not valid_sales:
-        await update.message.reply_text(f"⚠️ Not found: {', '.join(invalid_ids)}")
+        await update.message.reply_text(f"⚠️ Not found: {', '.join(code(i) for i in invalid_ids)}")
         return
     state.set(user_id, "editsale_ids", [s["id"] for s in valid_sales])
     state.set(user_id, "editsale_pending", {})
@@ -348,16 +348,16 @@ def _editsale_summary(sales, invalid_ids=None, created_drafts=None):
             price = s.get("price", 0) or 0
             sale_code = s.get("sale_code", f"#{s.get('id', '')}")
             text += (
-                f"• <b>{sale_code}</b> | {buyer} | "
+                f"• {code(sale_code)} | {buyer} | "
                 f"₹{price:.0f} | {ps_emoji} {esc(ps)}\n"
             )
     else:
         text = "<b>✏️ Editing sales:</b>\n\n"
     if created_drafts:
-        for acct_id, code in created_drafts:
-            text += f"\n📝 Created {code} for account #{acct_id}"
+        for acct_id, sale_code in created_drafts:
+            text += f"\n📝 Created {code(sale_code)} for account {code_id(acct_id)}"
     if invalid_ids:
-        text += f"\n⚠️ Not found: {', '.join(invalid_ids)}"
+        text += f"\n⚠️ Not found: {', '.join(code(i) for i in invalid_ids)}"
     return text
 
 
@@ -372,14 +372,14 @@ def _editsale_summary_with_pending(sales, pending, invalid_ids=None, created_dra
         price = p.get("price", s.get("price", 0)) or 0
         sale_code = s.get("sale_code", f"#{sid}")
         text += (
-            f"• <b>{sale_code}</b> | {buyer} | "
+            f"• {code(sale_code)} | {buyer} | "
             f"₹{price:.0f} | {ps_emoji} {esc(ps)}\n"
         )
     if created_drafts:
-        for acct_id, code in created_drafts:
-            text += f"\n📝 Created {code} for account #{acct_id}"
+        for acct_id, sale_code in created_drafts:
+            text += f"\n📝 Created {code(sale_code)} for account {code_id(acct_id)}"
     if invalid_ids:
-        text += f"\n⚠️ Not found: {', '.join(invalid_ids)}"
+        text += f"\n⚠️ Not found: {', '.join(code(i) for i in invalid_ids)}"
     return text
 
 

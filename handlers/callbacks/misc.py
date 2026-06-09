@@ -4,7 +4,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from core.permissions import require_seller, require_admin, get_user_role
 from core.state import state
-from core.format import esc, _truncate
+from core.format import esc, code, _truncate
 from core.keyboards import settings_keyboard, report_period_keyboard, category_keyboard
 from database import get_category_name
 from handlers.preview import handle_preview_category
@@ -57,7 +57,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         for s in sellers:
             status = "🟢" if s["active"] else "🔴"
             text += (
-                f"{status} {esc(s['name'])} (ID: {s['user_id']}) — "
+                f"{status} {esc(s['name'])} (ID: {code(s['user_id'])}) — "
                 f"{s['sale_count']} sales, ₹{s['total_earnings']:.0f}\n"
             )
         await query.edit_message_text(text, parse_mode="HTML")

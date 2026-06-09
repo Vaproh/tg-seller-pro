@@ -229,7 +229,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         state.pop(user_id, "delete_confirm", None)
         success = delete_account(account_id)
         if success:
-            await query.edit_message_text(f"✅ Account #{account_id} deleted.")
+            await query.edit_message_text(f"✅ Account {code_id(account_id)} deleted.")
         else:
             await query.edit_message_text("❌ Failed to delete account.")
         return True

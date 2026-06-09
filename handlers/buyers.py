@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from core.permissions import require_seller, get_user_role
-from core.format import esc
+from core.format import esc, code, code_id
 from core.state import state
 from database import get_buyers, get_buyer_sales
 from database.sellers import get_seller_by_user_id
@@ -44,12 +44,12 @@ async def buyer_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     seller_id = seller["id"] if seller else None
     sales = get_buyer_sales(buyer_name, seller_id=seller_id)
     if not sales:
-        await update.message.reply_text(f"📭 No purchases found for '{esc(buyer_name)}'.")
+        await update.message.reply_text(f"📭 No purchases found for '{code(buyer_name)}'.")
         return
-    text = f"<b>👤 Buyer: {esc(buyer_name)}</b>\n\n"
+    text = f"<b>👤 Buyer: {code(buyer_name)}</b>\n\n"
     for s in sales:
         text += (
-            f"• #{s['id']} | {esc(dict(s).get('category_name', '—'))} | "
+            f"• {code_id(s['id'])} | {esc(dict(s).get('category_name', '—'))} | "
             f"₹{s['price']:.0f} | {esc(s['payment_status'])} | "
             f"{esc(s['sold_at'][:10])}\n"
         )

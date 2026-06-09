@@ -4,6 +4,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 import config
+from core.format import code
 from database.sales import get_sales_summary, get_sales, count_sales
 from database.accounts import count_accounts
 from database.sellers import list_sellers
@@ -79,7 +80,7 @@ def _build_pending_payment_report():
     ]
     for s in pending:
         lines.append(
-            f"• #{s['id']} | {s['buyer_name']} | ₹{s['price']:.0f} | {str(s['sold_at'])[:10]}"
+            f"• {code(f'#{s['id']}')} | {code(s['buyer_name'])} | ₹{s['price']:.0f} | {str(s['sold_at'])[:10]}"
         )
     lines.append("")
     lines.append("Use /markpaid to confirm payment.")

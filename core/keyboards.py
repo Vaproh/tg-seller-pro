@@ -1,5 +1,6 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from database.categories import list_categories
+from core.format import esc
 
 
 def category_keyboard(callback_prefix, include_all=False):
@@ -123,7 +124,7 @@ def sell_select_keyboard(selected, accounts, page, total_pages, max_select=None)
         mark = "✅" if a["id"] in selected else "  "
         buttons.append([
             InlineKeyboardButton(
-                f"{mark} #{a['id']} | {a['username']}",
+                f"{mark} #{a['id']} | {esc(a['username'])}",
                 callback_data=f"selltoggle:{a['id']}",
             )
         ])

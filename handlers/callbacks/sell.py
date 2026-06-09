@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller
 from core.state import state
-from core.format import esc, _d, fmt_receipt, _truncate
+from core.format import esc, code, code_id, spoiler, _d, fmt_receipt, _truncate
 from core.keyboards import confirm_keyboard, sell_select_keyboard
 from core.filters import (
     buyer_keyboard, apply_list_filters,
@@ -75,13 +75,13 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             if buyer_names:
                 kb = buyer_keyboard(buyer_names, "buypick")
                 await query.edit_message_text(
-                    f"🎲 Picked: #{acc['id']} — {esc(acc['username'])}\n\n👤 Select buyer or type a new one:",
+                    f"🎲 Picked: {code_id(acc['id'])} — {code(acc['username'])}\n\n👤 Select buyer or type a new one:",
                     reply_markup=kb,
                 )
             else:
                 state.set(user_id, "sell_stage", "buyer")
                 await query.edit_message_text(
-                    f"🎲 Picked: #{acc['id']} — {esc(acc['username'])}\n\n👤 Enter buyer name:"
+                    f"🎲 Picked: {code_id(acc['id'])} — {code(acc['username'])}\n\n👤 Enter buyer name:"
                 )
         return True
 
@@ -190,7 +190,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             account = get_account_by_id(account_id)
             a = _d(account) if account else {}
             await query.edit_message_text(
-                f"💰 Selling: {esc(a.get('username', ''))}\n\n👤 Select buyer or type a new one:",
+                f"💰 Selling: {code(a.get('username', ''))}\n\n👤 Select buyer or type a new one:",
                 reply_markup=kb,
             )
         else:
@@ -212,7 +212,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         n = len(selected)
         label = f"{n} accounts" if n > 1 else "1 account"
         await query.edit_message_text(
-            f"👤 Buyer: {esc(buyer_name)}\n\n💰 Enter price per account (₹):"
+            f"👤 Buyer: {code(buyer_name)}\n\n💰 Enter price per account (₹):"
         )
         return True
 
@@ -235,8 +235,8 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             ps_label = "🟡 Pending Payment" if payment_status == "pending" else "🟢 Sold"
             text_preview = (
                 f"<b>Confirm Sale:</b>\n\n"
-                f"Account: #{a['id']} — {esc(a['username'])}\n"
-                f"Buyer: {esc(buyer)}\n"
+                f"Account: {code(f'#{a['id']}')} — {code(a['username'])}\n"
+                f"Buyer: {code(buyer)}\n"
                 f"Price: ₹{price:.0f}\n"
                 f"Status: {ps_label}\n\n"
                 f"✅ Confirm?"
@@ -246,7 +246,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             text_preview = (
                 f"<b>Confirm Bulk Sale:</b>\n\n"
                 f"Accounts: {len(selected)}\n"
-                f"Buyer: {esc(buyer)}\n"
+                f"Buyer: {code(buyer)}\n"
                 f"Price per account: ₹{price:.0f}\n"
                 f"Status: {ps_label}\n\n"
                 f"✅ Confirm?"
