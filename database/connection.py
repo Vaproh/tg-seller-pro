@@ -275,6 +275,36 @@ def init_db():
         INSERT OR IGNORE INTO categories (name, default_price) VALUES ('uncategorized', 0)
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS command_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            username TEXT,
+            seller_name TEXT,
+            command TEXT NOT NULL,
+            command_args TEXT,
+            status TEXT NOT NULL DEFAULT 'success',
+            error_reason TEXT,
+            error_detail TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS ix_command_logs_user_id
+        ON command_logs (user_id)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS ix_command_logs_created_at
+        ON command_logs (created_at)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS ix_command_logs_command
+        ON command_logs (command)
+    """)
+
     current_version = get_schema_version(conn)
     if current_version == 0:
         set_schema_version(conn, 1)

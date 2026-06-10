@@ -38,6 +38,7 @@ HELP_MAIN_ADMIN = """<b>📖 Help — Admin</b>
 /listsellers — See team
 
 <b>⚙️ Tools</b>
+/logs — View command activity
 /export — Download Excel file
 /backup — Download database
 /stats — Revenue stats & charts
@@ -454,6 +455,46 @@ Downloads all accounts as a CSV file.
 
 <b>How to use:</b>
 Type /export""",
+
+    "logs": """<b>📜 /logs — View Command Activity</b>
+
+<b>What it does:</b>
+Shows all commands used in the bot, who ran them, and when.
+
+<b>How to use:</b>
+Type /logs
+
+<b>Filters:</b>
+/logs seller alice — filter by seller name
+/logs command sell — filter by command
+/logs today — only today's logs
+/logs failed — only failed commands
+/logs denied — only permission denied
+/logs permission — permission errors
+/logs validation — validation errors
+/logs database — database errors
+/logs system — system errors
+
+<b>Filter buttons:</b>
+❌ Failed — show only failed commands
+🚫 Denied — show permission denied
+📋 All — show all commands
+🔐 Permission — permission errors
+⚠️ Validation — validation errors
+💾 Database — database errors
+🔧 System — system errors
+
+<b>Log entry includes:</b>
+👤 Seller name and username
+🆔 Telegram ID
+⚡ Command name
+📥 Command arguments
+✅/❌/🚫 Status
+📝 Failure reason (if failed)
+🔍 Internal details (admin only)
+🕒 Timestamp
+
+Use ⬅️ ➡️ to go between pages.""",
 
     "backup": """<b>💾 /backup — Download Database</b>
 
