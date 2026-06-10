@@ -434,8 +434,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             acc = get_account_by_id(aid)
             if acc:
                 accounts.append(_d(acc))
-        state.pop(user_id, "sample_stage", None)
-        state.pop(user_id, "sample_category", None)
+        for key in ("sample_stage", "sample_category", "sample_selected", "sample_page"):
+            state.pop(user_id, key, None)
         from handlers.callbacks.sell import _fmt_sample_output
         text_msg = _fmt_sample_output(accounts)
         await update.message.reply_text(_truncate(text_msg), parse_mode="HTML")

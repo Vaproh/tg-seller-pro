@@ -47,10 +47,12 @@ async def sample_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_seller(update):
         return
     user_id = update.effective_user.id
+    for key in ("sample_selected", "sample_page", "sample_filter",
+                 "sample_stage", "sample_category"):
+        state.pop(user_id, key, None)
     state.set(user_id, "sample_category", None)
     kb = category_keyboard("samplecat", include_all=True)
     if not kb:
-        state.set(user_id, "sample_category", None)
         kb2 = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("👆 Pick accounts", callback_data="samplemode:selectmany"),

@@ -75,7 +75,12 @@ def _fmt_sample_output(accounts):
             f"│ 🆔 ID: {acct_id}\n"
             f"╰───────────────────────"
         )
-    return "\n".join(lines)
+    result = "\n".join(lines)
+    if len(result) > 4000:
+        visible = len(accounts)
+        result = _truncate(result, 3900)
+        result += f"\n\n<i>({visible} accounts shown — message truncated)</i>"
+    return result
 
 
 async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str, user_id: int) -> bool:
@@ -291,10 +296,12 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
     if data == "menu:sample":
         if not await require_seller(update):
             return True
+        for key in ("sample_selected", "sample_page", "sample_filter",
+                     "sample_stage", "sample_category"):
+            state.pop(user_id, key, None)
         state.set(user_id, "sample_category", None)
         kb = category_keyboard("samplecat", include_all=True)
         if not kb:
-            state.set(user_id, "sample_category", None)
             await query.edit_message_text("📋 Generate account samples:", reply_markup=InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("👆 Pick accounts", callback_data="samplemode:selectmany"),
