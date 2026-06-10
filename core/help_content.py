@@ -14,6 +14,7 @@ HELP_MAIN_ADMIN = """<b>📖 Help — Admin</b>
 
 <b>💰 Sell</b>
 /sell — Sell accounts
+/sample — Generate account samples
 /sales — See all sales
 /sale — See one sale
 /markpaid — Mark as paid
@@ -55,6 +56,7 @@ HELP_MAIN_SELLER = """<b>📖 Help — Seller</b>
 
 <b>💰 Sell</b>
 /sell — Sell accounts
+/sample — Generate account samples
 /sales — See your sales
 /sale — See one sale
 /markpaid — Mark as paid
@@ -97,6 +99,34 @@ Lets you sell one or more accounts.
 - Tap accounts to toggle selection
 - Use ⬅️ ➡️ to go between pages
 - Price must be typed (no skipping)""",
+
+    "sample": """<b>📋 /sample — Generate Account Samples</b>
+
+<b>What it does:</b>
+Creates account previews for clients before selling.
+
+<b>How to use:</b>
+1. Type /sample
+2. Pick a category (or 📋 All)
+3. Choose accounts:
+   • <b>Pick accounts:</b> tap to select multiple
+   • <b>Enter number:</b> type how many (auto-picks)
+4. Review the generated sample list
+5. Copy/send samples to client
+
+<b>Output includes:</b>
+- Username
+- Profile link
+- 2FA status
+- Verification status
+- Account ID
+
+<b>Notes:</b>
+- Only 🟢 available accounts shown
+- Account status is never changed
+- No sales are registered
+- No sensitive info (passwords, emails) shown
+- Designed for client previews before purchase""",
 
     "sales": """<b>📈 /sales — View Sales</b>
 

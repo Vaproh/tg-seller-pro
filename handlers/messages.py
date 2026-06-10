@@ -411,6 +411,36 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # ── Sample flow (enter number) ─────────────────────────
+    sample_stage = state.get(user_id, "sample_stage")
+    if sample_stage == "number":
+        from database import count_accounts, get_available_account_ids
+        try:
+            num = int(text)
+        except ValueError:
+            await update.message.reply_text("⚠️ Enter a valid number:")
+            return
+        cat_id = state.get(user_id, "sample_category")
+        available = count_accounts(status="available", category_id=cat_id)
+        if num < 1:
+            await update.message.reply_text("⚠️ Must be at least 1:")
+            return
+        if num > available:
+            await update.message.reply_text(f"⚠️ Only {available} available. Enter a smaller number:")
+            return
+        account_ids = get_available_account_ids(num, category_id=cat_id)
+        accounts = []
+        for aid in account_ids:
+            acc = get_account_by_id(aid)
+            if acc:
+                accounts.append(_d(acc))
+        state.pop(user_id, "sample_stage", None)
+        state.pop(user_id, "sample_category", None)
+        from handlers.callbacks.sell import _fmt_sample_output
+        text_msg = _fmt_sample_output(accounts)
+        await update.message.reply_text(_truncate(text_msg), parse_mode="HTML")
+        return
+
 
 async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update):

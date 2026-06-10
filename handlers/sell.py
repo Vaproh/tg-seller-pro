@@ -43,6 +43,25 @@ async def sell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📂 Select category to sell from:", reply_markup=kb)
 
 
+async def sample_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_seller(update):
+        return
+    user_id = update.effective_user.id
+    state.set(user_id, "sample_category", None)
+    kb = category_keyboard("samplecat", include_all=True)
+    if not kb:
+        state.set(user_id, "sample_category", None)
+        kb2 = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("👆 Pick accounts", callback_data="samplemode:selectmany"),
+                InlineKeyboardButton("🔢 Enter number", callback_data="samplemode:number"),
+            ],
+        ])
+        await update.message.reply_text("📋 Generate account samples:", reply_markup=kb2)
+    else:
+        await update.message.reply_text("📂 Select category for samples:", reply_markup=kb)
+
+
 async def sales_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_seller(update):
         return

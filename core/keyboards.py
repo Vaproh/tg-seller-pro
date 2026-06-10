@@ -38,6 +38,9 @@ def main_menu_keyboard(is_admin=True):
                 InlineKeyboardButton("📊 Report", callback_data="menu:report"),
                 InlineKeyboardButton("⚙️ Settings", callback_data="menu:settings"),
             ],
+            [
+                InlineKeyboardButton("📋 Sample", callback_data="menu:sample"),
+            ],
         ]
     else:
         buttons = [
@@ -51,6 +54,7 @@ def main_menu_keyboard(is_admin=True):
             ],
             [
                 InlineKeyboardButton("📦 Inventory", callback_data="menu:inventory"),
+                InlineKeyboardButton("📋 Sample", callback_data="menu:sample"),
             ],
         ]
     return InlineKeyboardMarkup(buttons)
@@ -118,7 +122,7 @@ def report_period_keyboard():
     ])
 
 
-def sell_select_keyboard(selected, accounts, page, total_pages, max_select=None):
+def sell_select_keyboard(selected, accounts, page, total_pages, max_select=None, prefix="sell"):
     buttons = []
     for acc in accounts:
         a = acc if isinstance(acc, dict) else dict(acc)
@@ -126,22 +130,22 @@ def sell_select_keyboard(selected, accounts, page, total_pages, max_select=None)
         buttons.append([
             InlineKeyboardButton(
                 f"{mark} #{a['id']} | {esc(a['username'])}",
-                callback_data=f"selltoggle:{a['id']}",
+                callback_data=f"{prefix}toggle:{a['id']}",
             )
         ])
     nav_row = []
     if page > 1:
-        nav_row.append(InlineKeyboardButton("⬅️", callback_data=f"sellpage:{page - 1}"))
+        nav_row.append(InlineKeyboardButton("⬅️", callback_data=f"{prefix}page:{page - 1}"))
     nav_row.append(InlineKeyboardButton(f"📄 {page}/{total_pages}", callback_data="noop"))
     if page < total_pages:
-        nav_row.append(InlineKeyboardButton("➡️", callback_data=f"sellpage:{page + 1}"))
+        nav_row.append(InlineKeyboardButton("➡️", callback_data=f"{prefix}page:{page + 1}"))
     buttons.append(nav_row)
     limit_text = " (max 1)" if max_select == 1 else ""
     buttons.append([
         InlineKeyboardButton(
             f"✅ Done ({len(selected)} selected){limit_text}",
-            callback_data="selldone",
+            callback_data=f"{prefix}done",
         ),
-        InlineKeyboardButton("❌ Cancel", callback_data="sellcancel"),
+        InlineKeyboardButton("❌ Cancel", callback_data=f"{prefix}cancel"),
     ])
     return InlineKeyboardMarkup(buttons)

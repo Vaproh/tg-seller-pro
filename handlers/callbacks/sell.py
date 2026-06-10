@@ -10,18 +10,18 @@ from core.filters import (
 )
 from database import (
     get_account_by_id, get_sale_by_id, sell_account, get_seller_by_user_id,
-    count_accounts,
+    count_accounts, get_available_account_ids,
 )
 from database.sales import bulk_sell_accounts
 from utils.notifications import notify_admin
 import config
 
 
-def _refresh_select_page(user_id, query):
-    selected = state.get(user_id, "sell_selected", [])
-    page = state.get(user_id, "sell_page", 1)
-    filter_str = state.get(user_id, "sell_filter") or "status:available"
-    cat_id = state.get(user_id, "sell_category")
+def _refresh_select_page(user_id, query, prefix="sell"):
+    selected = state.get(user_id, f"{prefix}_selected", [])
+    page = state.get(user_id, f"{prefix}_page", 1)
+    filter_str = state.get(user_id, f"{prefix}_filter") or "status:available"
+    cat_id = state.get(user_id, f"{prefix}_category")
     if cat_id:
         filter_str = f"cat:{cat_id}|{filter_str}"
     accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE)
@@ -38,6 +38,14 @@ def _sell_filter_str(user_id):
     return base
 
 
+def _sample_filter_str(user_id):
+    cat_id = state.get(user_id, "sample_category")
+    base = "status:available"
+    if cat_id:
+        return f"cat:{cat_id}|{base}"
+    return base
+
+
 def _mode_keyboard():
     return InlineKeyboardMarkup([
         [
@@ -45,6 +53,29 @@ def _mode_keyboard():
             InlineKeyboardButton("🔢 Enter number", callback_data="sellmode:number"),
         ],
     ])
+
+
+def _fmt_sample_output(accounts):
+    if not accounts:
+        return "📭 No accounts found."
+    lines = [f"<b>📋 Account Samples — {len(accounts)} account(s)</b>\n"]
+    for acc in accounts:
+        a = acc if isinstance(acc, dict) else dict(acc)
+        username = a.get("username", "?")
+        profile_link = f"https://reddit.com/user/{username}"
+        has_2fa = "Yes" if a.get("has_2fa") else "No"
+        is_verified = "Yes" if a.get("is_verified") else "No"
+        acct_id = a.get("id", "?")
+        lines.append(
+            f"╭─ Account #{acct_id} ──────────\n"
+            f"│ 👤 Username: <code>{esc(username)}</code>\n"
+            f"│ 🔗 Link: {profile_link}\n"
+            f"│ 🔐 2FA: {has_2fa}\n"
+            f"│ ✅ Verified: {is_verified}\n"
+            f"│ 🆔 ID: {acct_id}\n"
+            f"╰───────────────────────"
+        )
+    return "\n".join(lines)
 
 
 async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str, user_id: int) -> bool:
@@ -254,6 +285,129 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
                      "sell_stage", "sell_filter", "sell_page", "sell_category"):
             state.pop(user_id, key, None)
         await query.edit_message_text("❌ Sale cancelled.")
+        return True
+
+    # ── Sample flow ────────────────────────────────────────
+    if data == "menu:sample":
+        if not await require_seller(update):
+            return True
+        state.set(user_id, "sample_category", None)
+        kb = category_keyboard("samplecat", include_all=True)
+        if not kb:
+            state.set(user_id, "sample_category", None)
+            await query.edit_message_text("📋 Generate account samples:", reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("👆 Pick accounts", callback_data="samplemode:selectmany"),
+                    InlineKeyboardButton("🔢 Enter number", callback_data="samplemode:number"),
+                ],
+            ]))
+        else:
+            await query.edit_message_text("📂 Select category for samples:", reply_markup=kb)
+        return True
+
+    if data.startswith("samplecat:"):
+        if not await require_seller(update):
+            return True
+        cat_value = data.split(":", 1)[1]
+        if cat_value == "all":
+            state.set(user_id, "sample_category", None)
+        else:
+            state.set(user_id, "sample_category", int(cat_value))
+        await query.edit_message_text("📋 Generate account samples:", reply_markup=InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("👆 Pick accounts", callback_data="samplemode:selectmany"),
+                InlineKeyboardButton("🔢 Enter number", callback_data="samplemode:number"),
+            ],
+        ]))
+        return True
+
+    if data.startswith("samplemode:"):
+        if not await require_seller(update):
+            return True
+        mode = data.split(":", 1)[1]
+        filter_str = _sample_filter_str(user_id)
+
+        if mode == "selectmany":
+            state.set(user_id, "sample_selected", [])
+            state.set(user_id, "sample_page", 1)
+            accounts, total = apply_list_filters(filter_str, limit=PAGE_SIZE, offset=0)
+            total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+            text = f"<b>📋 Pick Accounts for Sample — Tap to select</b>\n\n"
+            for acc in accounts:
+                text += fmt_account_list_line(acc) + "\n"
+            kb = sell_select_keyboard([], accounts, 1, total_pages, max_select=None, prefix="sample")
+            await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+
+        elif mode == "number":
+            cat_id = state.get(user_id, "sample_category")
+            available = count_accounts(status="available", category_id=cat_id)
+            state.set(user_id, "sample_stage", "number")
+            await query.edit_message_text(
+                f"🔢 How many accounts for sample? (available: {available})"
+            )
+        return True
+
+    if data.startswith("sampletoggle:"):
+        if not await require_seller(update):
+            return True
+        try:
+            account_id = int(data.split(":")[1])
+        except ValueError:
+            return True
+        selected = state.get(user_id, "sample_selected", [])
+        if account_id in selected:
+            selected.remove(account_id)
+        else:
+            selected.append(account_id)
+        state.set(user_id, "sample_selected", selected)
+        selected, accounts, page, total_pages, filter_str = _refresh_select_page(user_id, query, prefix="sample")
+        text = f"<b>📋 Pick Accounts for Sample — {len(selected)} selected</b>\n\n"
+        for acc in accounts:
+            text += fmt_account_list_line(acc) + "\n"
+        kb = sell_select_keyboard(selected, accounts, page, total_pages, max_select=None, prefix="sample")
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return True
+
+    if data.startswith("samplepage:"):
+        if not await require_seller(update):
+            return True
+        try:
+            page = int(data.split(":")[1])
+        except ValueError:
+            return True
+        state.set(user_id, "sample_page", page)
+        selected, accounts, page, total_pages, filter_str = _refresh_select_page(user_id, query, prefix="sample")
+        text = f"<b>📋 Pick Accounts for Sample — {len(selected)} selected</b>\n\n"
+        for acc in accounts:
+            text += fmt_account_list_line(acc) + "\n"
+        kb = sell_select_keyboard(selected, accounts, page, total_pages, max_select=None, prefix="sample")
+        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        return True
+
+    if data == "sampledone":
+        if not await require_seller(update):
+            return True
+        selected = state.get(user_id, "sample_selected", [])
+        if not selected:
+            await query.edit_message_text("⚠️ No accounts selected.")
+            return True
+        accounts = []
+        for aid in selected:
+            acc = get_account_by_id(aid)
+            if acc:
+                accounts.append(_d(acc))
+        for key in ("sample_selected", "sample_page", "sample_filter",
+                     "sample_stage", "sample_category"):
+            state.pop(user_id, key, None)
+        text = _fmt_sample_output(accounts)
+        await query.edit_message_text(_truncate(text), parse_mode="HTML")
+        return True
+
+    if data == "samplecancel":
+        for key in ("sample_selected", "sample_page", "sample_filter",
+                     "sample_stage", "sample_category"):
+            state.pop(user_id, key, None)
+        await query.edit_message_text("❌ Sample cancelled.")
         return True
 
     return False

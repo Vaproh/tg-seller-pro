@@ -64,6 +64,7 @@ async def post_init(application):
         BotCommand("search", "🔎 Search accounts"),
         BotCommand("getid", "🔍 View account by ID"),
         BotCommand("sell", "💰 Sell accounts"),
+        BotCommand("sample", "📋 Generate account samples"),
         BotCommand("sales", "📈 View all sales"),
         BotCommand("sale", "🧾 Sale detail by ID"),
         BotCommand("markpaid", "💳 Toggle payment status"),
