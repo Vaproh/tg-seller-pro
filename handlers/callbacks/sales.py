@@ -1,5 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+from telegram.error import BadRequest
 from core.permissions import require_seller, get_user_role
 from core.state import state
 from core.format import _d, _truncate, esc, code, code_id
@@ -9,6 +10,18 @@ from database import get_sale_by_id, count_sales, get_sales, get_seller_by_user_
 from database.sales import update_sale, get_sales_summary
 from utils.notifications import notify_admin, fmt_void_notification
 import config
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+async def _safe_edit(query, text, **kwargs):
+    try:
+        await query.edit_message_text(text, **kwargs)
+    except BadRequest as e:
+        if "Message is not modified" not in str(e):
+            logger.error("Failed to edit message: %s", e)
+            raise
 
 
 async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str, user_id: int) -> bool:
@@ -33,7 +46,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         summary = get_sales_summary(seller_id=seller_id)
         text = _fmt_sales_page(sales, 1, total_pages, summary=summary)
         kb = _sales_keyboard(1, total_pages)
-        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        await _safe_edit(query, _truncate(text), parse_mode="HTML", reply_markup=kb)
         return True
 
     if data.startswith("salesfilter:") and not data.startswith("salesfilterpage:"):
@@ -56,7 +69,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         summary = get_sales_summary(seller_id=seller_id, period=status_val)
         text = _fmt_sales_page(sales, 1, total_pages, summary=summary)
         kb = _sales_keyboard(1, total_pages)
-        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        await _safe_edit(query, _truncate(text), parse_mode="HTML", reply_markup=kb)
         return True
 
     if data.startswith("salesfilterpage:"):
@@ -80,7 +93,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         summary = get_sales_summary(seller_id=seller_id, period=sf)
         text = _fmt_sales_page(sales, page, total_pages, summary=summary)
         kb = _sales_keyboard(page, total_pages)
-        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        await _safe_edit(query, _truncate(text), parse_mode="HTML", reply_markup=kb)
         return True
 
     if data.startswith("markpaid:"):
@@ -266,7 +279,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
                 parts = ", ".join(f"{k}={v}" for k, v in fields.items())
                 text += f"• {code_id(sid)}: {parts}\n"
         kb = _editsale_field_keyboard()
-        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        await _safe_edit(query, _truncate(text), parse_mode="HTML", reply_markup=kb)
         return True
 
     if data.startswith("editsale:set:"):
@@ -290,7 +303,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         text = _editsale_summary_with_pending(sales, pending)
         text += f"\n\n✅ Set {field} → <code>{esc(value)}</code> for all {len(sale_ids)} sale(s)"
         kb = _editsale_field_keyboard()
-        await query.edit_message_text(_truncate(text), parse_mode="HTML", reply_markup=kb)
+        await _safe_edit(query, _truncate(text), parse_mode="HTML", reply_markup=kb)
         return True
 
     if data == "editsale:done":
@@ -321,7 +334,12 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
             else:
                 parts.append(f"✏️ Updated {code(sale_code)}: {', '.join(field_names)}")
         if failed:
-            parts.append(f"⚠️ Failed: {', '.join(code(i) for i in failed)}")
+            failed_codes = []
+            for fid in failed:
+                s = get_sale_by_id(fid)
+                sc = _d(s).get("sale_code", f"#{fid}") if s else f"#{fid}"
+                failed_codes.append(code(sc))
+            parts.append(f"⚠️ Failed: {', '.join(failed_codes)}")
         await query.edit_message_text("\n".join(parts), parse_mode="HTML")
         return True
 

@@ -1,6 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_admin
+from core.format import _d
 from core.keyboards import report_period_keyboard
 from database import get_sales_summary, list_categories
 from database.sellers import list_sellers
@@ -38,14 +39,16 @@ async def handle_report_period(update: Update, context: ContextTypes.DEFAULT_TYP
     text += "<b>By Seller:</b>\n"
     has_seller_sales = False
     for s in sellers:
-        if s.get("sale_count", 0) > 0:
-            text += f"• {s['name']}: {s['sale_count']} sales, {config.CURRENCY}{s['total_earnings']:.0f}\n"
+        sd = _d(s)
+        if sd.get("sale_count", 0) > 0:
+            text += f"• {sd['name']}: {sd['sale_count']} sales, {config.CURRENCY}{sd['total_earnings']:.0f}\n"
             has_seller_sales = True
     if not has_seller_sales:
         text += "• No sales yet\n"
     text += "\n<b>By Category:</b>\n"
     for cat in cats:
-        text += f"• {cat['name']}: {cat.get('account_count', 0)} accounts\n"
+        cd = _d(cat)
+        text += f"• {cd['name']}: {cd.get('account_count', 0)} accounts\n"
     text += f"\n<b>All-Time Total:</b> {config.CURRENCY}{total.get('total_revenue', 0):.0f}"
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("⬅️ Back", callback_data="menu:back")],

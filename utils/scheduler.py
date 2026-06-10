@@ -4,7 +4,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 import config
-from core.format import code
+from core.format import code, _d
 from database.sales import get_sales_summary, get_sales, count_sales
 from database.accounts import count_accounts
 from database.sellers import list_sellers
@@ -35,8 +35,9 @@ def _build_daily_report():
         ]
         has_sales = False
         for s in sellers:
-            if s.get("sale_count", 0) > 0:
-                lines.append(f"• {s['name']}: {s['sale_count']} sales, {config.CURRENCY}{s['total_earnings']:.0f}")
+            sd = _d(s)
+            if sd.get("sale_count", 0) > 0:
+                lines.append(f"• {sd['name']}: {sd['sale_count']} sales, {config.CURRENCY}{sd['total_earnings']:.0f}")
                 has_sales = True
         if not has_sales:
             lines.append("• No sales yet")
@@ -69,8 +70,9 @@ def _build_weekly_report():
         ]
         has_sales = False
         for s in sellers:
-            if s.get("sale_count", 0) > 0:
-                lines.append(f"• {s['name']}: {s['sale_count']} sales, {config.CURRENCY}{s['total_earnings']:.0f}")
+            sd = _d(s)
+            if sd.get("sale_count", 0) > 0:
+                lines.append(f"• {sd['name']}: {sd['sale_count']} sales, {config.CURRENCY}{sd['total_earnings']:.0f}")
                 has_sales = True
         if not has_sales:
             lines.append("• No sales yet")
@@ -85,12 +87,13 @@ def _build_pending_payment_report():
         pending = get_sales(limit=50, status="pending")
         if not pending:
             return None
-        total_pending = sum(s.get("price", 0) for s in pending)
+        pending_dicts = [_d(s) for s in pending]
+        total_pending = sum(s.get("price", 0) for s in pending_dicts)
         lines = [
-            f"🟡 <b>Pending Payment Reminder — {len(pending)} sales ({config.CURRENCY}{total_pending:.0f})</b>",
+            f"🟡 <b>Pending Payment Reminder — {len(pending_dicts)} sales ({config.CURRENCY}{total_pending:.0f})</b>",
             "",
         ]
-        for s in pending:
+        for s in pending_dicts:
             sale_code = s.get("sale_code", f"#{s.get('id', '?')}")
             lines.append(
                 f"• {code(sale_code)} | "
