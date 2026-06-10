@@ -168,8 +168,9 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         parts = data.split(":")
         field = parts[1]
         val = parts[2] == "yes"
+        db_key = "has_2fa" if field == "2fa" else "is_verified" if field == "verified" else field
         mapping = state.get(user_id, "csv_mapping", {})
-        mapping[field] = val
+        mapping[db_key] = val
         state.set(user_id, "csv_mapping", mapping)
         if field == "2fa":
             state.set(user_id, "csv_stage", "map_verified")
