@@ -441,6 +441,76 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(_truncate(text_msg), parse_mode="HTML")
         return
 
+    # ── Dues add flow ──────────────────────────────────────
+    duesadd_step = state.get(user_id, "duesadd_step")
+    if duesadd_step == "amount":
+        try:
+            amount = float(text.replace(config.CURRENCY, "").replace(",", ""))
+        except ValueError:
+            await update.message.reply_text("⚠️ Enter a valid amount:")
+            return
+        if amount <= 0:
+            await update.message.reply_text("⚠️ Amount must be positive:")
+            return
+        state.set(user_id, "duesadd_amount", amount)
+        state.set(user_id, "duesadd_step", "reason")
+        await update.message.reply_text(
+            f"💰 Adding {config.CURRENCY}{amount:.0f} to dues.\n\n📝 Enter a reason:"
+        )
+        return
+
+    if duesadd_step == "reason":
+        from database.sellers import get_seller_by_user_id
+        from database.dues import add_due
+        amount = state.get(user_id, "duesadd_amount")
+        state.pop(user_id, "duesadd_step", None)
+        state.pop(user_id, "duesadd_amount", None)
+        reason = text if text.lower() != "/skip" else None
+        seller = get_seller_by_user_id(user_id)
+        if seller and amount:
+            add_due(seller["id"], amount, reason)
+            await update.message.reply_text(
+                f"✅ <b>Due Added</b>\n\n💰 Amount: {config.CURRENCY}{amount:.0f}\n"
+                f"📝 Reason: {esc(reason) if reason else '—'}",
+                parse_mode="HTML",
+            )
+        return
+
+    # ── Dues remove flow ───────────────────────────────────
+    duesremove_step = state.get(user_id, "duesremove_step")
+    if duesremove_step == "amount":
+        try:
+            amount = float(text.replace(config.CURRENCY, "").replace(",", ""))
+        except ValueError:
+            await update.message.reply_text("⚠️ Enter a valid amount:")
+            return
+        if amount <= 0:
+            await update.message.reply_text("⚠️ Amount must be positive:")
+            return
+        state.set(user_id, "duesremove_amount", amount)
+        state.set(user_id, "duesremove_step", "reason")
+        await update.message.reply_text(
+            f"📉 Removing {config.CURRENCY}{amount:.0f} from dues.\n\n📝 Enter a reason:"
+        )
+        return
+
+    if duesremove_step == "reason":
+        from database.sellers import get_seller_by_user_id
+        from database.dues import remove_due
+        amount = state.get(user_id, "duesremove_amount")
+        state.pop(user_id, "duesremove_step", None)
+        state.pop(user_id, "duesremove_amount", None)
+        reason = text if text.lower() != "/skip" else None
+        seller = get_seller_by_user_id(user_id)
+        if seller and amount:
+            remove_due(seller["id"], amount, reason)
+            await update.message.reply_text(
+                f"✅ <b>Due Removed</b>\n\n💰 Amount: {config.CURRENCY}{amount:.0f}\n"
+                f"📝 Reason: {esc(reason) if reason else '—'}",
+                parse_mode="HTML",
+            )
+        return
+
 
 async def handle_csv_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update):

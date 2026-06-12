@@ -24,6 +24,11 @@ HELP_MAIN_ADMIN = """<b>📖 Help — Admin</b>
 /markpendingpayment — Mark 🟡 waiting for money
 /editsale — Edit sale details
 
+<b>💳 Dues</b>
+/dues — View dues
+/duesadd — Add due
+/duesremove — Remove due
+
 <b>📂 Other</b>
 /preview — Show accounts from a category
 /categories — See all categories
@@ -66,6 +71,11 @@ HELP_MAIN_SELLER = """<b>📖 Help — Seller</b>
 /markunsold — Mark 🟢 available
 /markpendingpayment — Mark 🟡 waiting for money
 /editsale — Edit sale details
+
+<b>💳 Dues</b>
+/dues — View your dues
+/duesadd — Add due
+/duesremove — Remove due
 
 <b>📂 Other</b>
 /preview — Show accounts from a category
@@ -463,6 +473,36 @@ Option 2: Type /transfersales → pick seller → pick target
 - Account statuses stay the same
 - Admin only
 - Cannot transfer to same seller""",
+
+    "dues": """<b>💳 /dues — View Dues</b>
+
+<b>What it does:</b>
+Shows dues balance and history.
+
+<b>How to use:</b>
+Type /dues
+
+<b>Admin options:</b>
+/dues all — see all sellers' balances
+/dues @name — see specific seller's history""",
+
+    "duesadd": """<b>💰 /duesadd — Add Due</b>
+
+<b>What it does:</b>
+Adds a due amount with a reason.
+
+<b>How to use:</b>
+Option 1: /duesadd 500 Reason here
+Option 2: /duesadd → enter amount → enter reason""",
+
+    "duesremove": """<b>📉 /duesremove — Remove Due</b>
+
+<b>What it does:</b>
+Removes a due amount with a reason.
+
+<b>How to use:</b>
+Option 1: /duesremove 500 Reason here
+Option 2: /duesremove → enter amount → enter reason""",
 
     "export": """<b>📤 /export — Download Excel</b>
 

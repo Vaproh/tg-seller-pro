@@ -24,6 +24,7 @@ from handlers.export import export_cmd, backup_cmd
 from handlers.stats import stats_cmd
 from handlers.logs import logs_cmd, logs_page, logs_filter
 from handlers.transfersales import transfersales_cmd
+from handlers.dues import dues_cmd, duesadd_cmd, duesremove_cmd
 from handlers.callbacks import handle_callback
 from handlers.messages import handle_text, handle_csv_upload
 from handlers.errors import error_handler
@@ -78,6 +79,9 @@ def register_handlers(application: Application):
     application.add_handler(CommandHandler("stats", stats_cmd))
     application.add_handler(CommandHandler("logs", logs_cmd))
     application.add_handler(CommandHandler("transfersales", transfersales_cmd))
+    application.add_handler(CommandHandler("dues", dues_cmd))
+    application.add_handler(CommandHandler("duesadd", duesadd_cmd))
+    application.add_handler(CommandHandler("duesremove", duesremove_cmd))
 
     application.add_handler(CallbackQueryHandler(logs_page, pattern=r"^logs"))
     application.add_handler(CallbackQueryHandler(logs_filter, pattern=r"^logsfilter"))

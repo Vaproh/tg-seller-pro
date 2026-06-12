@@ -305,6 +305,23 @@ def init_db():
         ON command_logs (command)
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS dues (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            seller_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            reason TEXT,
+            type TEXT NOT NULL DEFAULT 'add',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE CASCADE
+        )
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS ix_dues_seller_id
+        ON dues (seller_id)
+    """)
+
     current_version = get_schema_version(conn)
     if current_version == 0:
         set_schema_version(conn, 1)
