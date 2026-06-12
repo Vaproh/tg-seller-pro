@@ -356,3 +356,16 @@ def get_payment_breakdown(seller_id=None):
         return conn.execute(query, params).fetchall()
     finally:
         conn.close()
+
+
+def transfer_sales(from_seller_id, to_seller_id):
+    conn = connect()
+    try:
+        result = conn.execute(
+            "UPDATE sales SET seller_id = ? WHERE seller_id = ?",
+            (to_seller_id, from_seller_id),
+        )
+        conn.commit()
+        return result.rowcount
+    finally:
+        conn.close()

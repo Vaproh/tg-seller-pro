@@ -25,36 +25,28 @@ def main_menu_keyboard(is_admin=True):
         buttons = [
             [
                 InlineKeyboardButton("➕ Add", callback_data="menu:add"),
-                InlineKeyboardButton("💰 Sell", callback_data="menu:sell"),
                 InlineKeyboardButton("📋 List", callback_data="menu:list"),
+                InlineKeyboardButton("🔎 Search", callback_data="menu:search"),
             ],
             [
-                InlineKeyboardButton("🔎 Search", callback_data="menu:search"),
                 InlineKeyboardButton("📈 Sales", callback_data="menu:sales"),
                 InlineKeyboardButton("📦 Inventory", callback_data="menu:inventory"),
+                InlineKeyboardButton("👥 Sellers", callback_data="menu:sellers"),
             ],
             [
-                InlineKeyboardButton("👥 Sellers", callback_data="menu:sellers"),
                 InlineKeyboardButton("📊 Report", callback_data="menu:report"),
                 InlineKeyboardButton("⚙️ Settings", callback_data="menu:settings"),
-            ],
-            [
-                InlineKeyboardButton("📋 Sample", callback_data="menu:sample"),
             ],
         ]
     else:
         buttons = [
             [
-                InlineKeyboardButton("💰 Sell", callback_data="menu:sell"),
                 InlineKeyboardButton("📋 List", callback_data="menu:list"),
-            ],
-            [
                 InlineKeyboardButton("🔎 Search", callback_data="menu:search"),
-                InlineKeyboardButton("📈 Sales", callback_data="menu:sales"),
             ],
             [
+                InlineKeyboardButton("📈 Sales", callback_data="menu:sales"),
                 InlineKeyboardButton("📦 Inventory", callback_data="menu:inventory"),
-                InlineKeyboardButton("📋 Sample", callback_data="menu:sample"),
             ],
         ]
     return InlineKeyboardMarkup(buttons)

@@ -86,6 +86,7 @@ async def post_init(application):
         BotCommand("backup", "💾 DB backup (admin)"),
         BotCommand("stats", "📊 Revenue stats & charts"),
         BotCommand("logs", "📋 View command activity (admin)"),
+        BotCommand("transfersales", "🔄 Transfer sales between sellers (admin)"),
         BotCommand("delete", "🗑️ Delete account (admin)"),
         BotCommand("bulkdelete", "🗑️ Bulk delete (admin)"),
     ]

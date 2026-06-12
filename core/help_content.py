@@ -36,6 +36,7 @@ HELP_MAIN_ADMIN = """<b>📖 Help — Admin</b>
 /addseller — Add team member
 /removeseller — Remove team member
 /listsellers — See team
+/transfersales — Transfer sales between sellers
 
 <b>⚙️ Tools</b>
 /logs — View command activity
@@ -447,6 +448,21 @@ Shows all sellers and their stats.
 
 <b>How to use:</b>
 Type /listsellers""",
+
+    "transfersales": """<b>🔄 /transfersales — Transfer Sales</b>
+
+<b>What it does:</b>
+Moves all sales from one seller to another.
+
+<b>How to use:</b>
+Option 1: Type /transfersales Alice Bob
+Option 2: Type /transfersales → pick seller → pick target
+
+<b>Notes:</b>
+- All sales records are transferred
+- Account statuses stay the same
+- Admin only
+- Cannot transfer to same seller""",
 
     "export": """<b>📤 /export — Download Excel</b>
 
