@@ -22,7 +22,8 @@ async def handle_transfersales_callback(update: Update, context: ContextTypes.DE
             await query.edit_message_text("⚠️ Session expired. Please start again.")
             return True
         transferred = transfer_sales(from_seller["id"], to_seller["id"])
-        state.clear(user_id, "transfersales_from", "transfersales_to", "transfersales_count")
+        for key in ("transfersales_from", "transfersales_to", "transfersales_count", "transfersales_step"):
+            state.pop(user_id, key, None)
         text = (
             f"✅ <b>Transfer Complete</b>\n\n"
             f"Transferred {transferred} sales from "
@@ -33,7 +34,8 @@ async def handle_transfersales_callback(update: Update, context: ContextTypes.DE
         return True
 
     if data == "transfersales:cancel":
-        state.clear(user_id, "transfersales_from", "transfersales_to", "transfersales_count")
+        for key in ("transfersales_from", "transfersales_to", "transfersales_count", "transfersales_step"):
+            state.pop(user_id, key, None)
         await query.edit_message_text("❌ Transfer cancelled.")
         return True
 
@@ -86,7 +88,8 @@ async def handle_transfersales_callback(update: Update, context: ContextTypes.DE
                 return True
             count = count_sales(seller_id=from_seller["id"])
             if count == 0:
-                state.clear(user_id, "transfersales_from", "transfersales_to", "transfersales_step", "transfersales_count")
+                for key in ("transfersales_from", "transfersales_to", "transfersales_step", "transfersales_count"):
+                    state.pop(user_id, key, None)
                 await query.edit_message_text(f"📭 <code>{esc(from_seller['name'])}</code> has no sales to transfer.", parse_mode="HTML")
                 return True
             state.set(user_id, "transfersales_to", picked)
