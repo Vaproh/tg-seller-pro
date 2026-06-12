@@ -487,6 +487,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if amount <= 0:
             await update.message.reply_text("⚠️ Amount must be positive:")
             return
+        from database.sellers import get_seller_by_user_id as _get_seller
+        from database.dues import get_dues_balance as _get_balance
+        _seller = _get_seller(user_id)
+        if _seller:
+            _balance = _get_balance(_seller["id"])
+            if amount > _balance:
+                await update.message.reply_text(
+                    f"⚠️ Cannot remove {config.CURRENCY}{amount:.0f}. "
+                    f"Your balance is {config.CURRENCY}{_balance:.0f}."
+                )
+                return
         state.set(user_id, "duesremove_amount", amount)
         state.set(user_id, "duesremove_step", "reason")
         await update.message.reply_text(

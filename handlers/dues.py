@@ -9,7 +9,6 @@ from database.dues import (
     get_all_dues_balances, get_dues_history, count_dues,
 )
 import config
-from datetime import datetime
 
 DUES_PER_PAGE = 5
 
@@ -99,14 +98,16 @@ async def dues_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     seller_id = seller["id"] if seller else None
     if role == "admin":
         balances = get_all_dues_balances()
+        text = "<b>💳 Seller Dues Overview</b>\n\n"
         if balances:
-            text = "<b>💳 Seller Dues Overview</b>\n\n"
             for b in balances:
                 bd = dict(b) if not isinstance(b, dict) else b
                 text += f"👤 <code>{esc(bd['seller_name'])}</code> — {config.CURRENCY}{bd['balance']:.0f}\n"
-            text += "\n<i>Use /dues all for full history or /dues @name for specific seller</i>"
-            await update.message.reply_text(_truncate(text), parse_mode="HTML")
-            return
+        else:
+            text += "📭 No pending dues."
+        text += "\n\n<i>Use /dues @name for seller history</i>"
+        await update.message.reply_text(_truncate(text), parse_mode="HTML")
+        return
     balance = get_dues_balance(seller_id) if seller_id else 0
     total = count_dues(seller_id=seller_id)
     if total == 0:
@@ -184,6 +185,13 @@ async def duesremove_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except ValueError:
             await update.message.reply_text("⚠️ Invalid amount. Usage: /duesremove 500")
             return
+        balance = get_dues_balance(seller["id"])
+        if amount > balance:
+            await update.message.reply_text(
+                f"⚠️ Cannot remove {config.CURRENCY}{amount:.0f}. "
+                f"Your balance is {config.CURRENCY}{balance:.0f}."
+            )
+            return
         reason = " ".join(args[1:]) if len(args) > 1 else None
         if not reason:
             state.set(user_id, "duesremove_amount", amount)
@@ -201,8 +209,12 @@ async def duesremove_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML",
         )
         return
+    balance = get_dues_balance(seller["id"])
+    if balance <= 0:
+        await update.message.reply_text("📭 No dues to remove.")
+        return
     state.set(user_id, "duesremove_step", "amount")
     await update.message.reply_text(
-        "📉 <b>Remove Due</b>\n\nHow much do you want to remove?",
+        f"📉 <b>Remove Due</b> (Balance: {config.CURRENCY}{balance:.0f})\n\nHow much do you want to remove?",
         parse_mode="HTML",
     )

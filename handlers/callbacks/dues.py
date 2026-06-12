@@ -3,9 +3,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from core.state import state
 from core.format import esc, _truncate
-from database.sellers import get_seller_by_user_id
-from database.dues import add_due, remove_due, get_dues_history, count_dues
-import config
+from database.dues import get_dues_history, count_dues
 
 logger = logging.getLogger(__name__)
 
