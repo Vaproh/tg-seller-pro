@@ -1,5 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+from telegram.error import BadRequest
 from core.permissions import require_seller
 from core.state import state
 from core.format import esc, code, code_id, spoiler, _d, fmt_receipt, _truncate, reddit_url
@@ -15,6 +16,9 @@ from database import (
 from database.sales import bulk_sell_accounts
 from utils.notifications import notify_admin
 import config
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _refresh_select_page(user_id, query, prefix="sell"):
@@ -284,28 +288,67 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
                 acc = get_account_by_id(sid)
                 if acc:
                     sold_accounts.append(_d(acc))
+
+            chat_id = update.effective_chat.id
+
             if sold_accounts:
-                text = f"✅ <b>Bulk {status_label}: {len(sold_accounts)} accounts</b>\n\n"
+                blocks = []
                 for a in sold_accounts:
-                    text += (
+                    block = (
                         f"╭─ #{code_id(a.get('id', ''))} ─────────\n"
                         f"│ 👤 {code(a.get('username', ''))}\n"
                         f"│ 🔑 {spoiler(a.get('password', ''))}\n"
                     )
                     if a.get("email"):
-                        text += f"│ 📧 {code(a['email'])}\n"
+                        block += f"│ 📧 {code(a['email'])}\n"
                     if a.get("email_password"):
-                        text += f"│ 🔑 Email Pass: {spoiler(a['email_password'])}\n"
-                    text += (
+                        block += f"│ 🔑 Email Pass: {spoiler(a['email_password'])}\n"
+                    block += (
                         f"│ 🔗 {code(reddit_url(a.get('username', '')))}\n"
-                        f"╰──────────────────\n\n"
+                        f"╰──────────────────\n"
                     )
-                text += f"💰 {config.CURRENCY}{price:.0f} each"
-                await query.edit_message_text(_truncate(text), parse_mode="HTML")
+                    blocks.append(block)
+
+                header = f"✅ <b>Bulk {status_label}: {len(sold_accounts)} accounts</b>\n\n"
+                footer = f"\n💰 {config.CURRENCY}{price:.0f} each"
+
+                msg_text = header
+                for block in blocks:
+                    if len(msg_text) + len(block) + len(footer) > 3900:
+                        try:
+                            await context.bot.send_message(chat_id=chat_id, text=_truncate(msg_text), parse_mode="HTML")
+                        except BadRequest as e:
+                            logger.error("Failed to send bulk creds: %s", e)
+                            try:
+                                await context.bot.send_message(chat_id=chat_id, text=msg_text)
+                            except Exception:
+                                pass
+                        msg_text = block
+                    else:
+                        msg_text += block
+                msg_text += footer
+                try:
+                    await context.bot.send_message(chat_id=chat_id, text=_truncate(msg_text), parse_mode="HTML")
+                except BadRequest as e:
+                    logger.error("Failed to send bulk creds: %s", e)
+                    try:
+                        await context.bot.send_message(chat_id=chat_id, text=msg_text)
+                    except Exception:
+                        pass
+
+                try:
+                    await query.edit_message_text(
+                        f"✅ Bulk {status_label}: {len(sold_accounts)} accounts — {config.CURRENCY}{price:.0f} each"
+                    )
+                except BadRequest:
+                    pass
             else:
-                await query.edit_message_text(
-                    f"✅ Bulk {status_label}: {result['added']} accounts, {result['skipped']} skipped"
-                )
+                try:
+                    await query.edit_message_text(
+                        f"✅ Bulk {status_label}: {result['added']} accounts, {result['skipped']} skipped"
+                    )
+                except BadRequest:
+                    pass
             await notify_admin(context, f"💰 Bulk sell: {result['added']} accounts — {config.CURRENCY}{price:.0f} each ({status_label}) — by {esc(seller['name'])}")
         return True
 
