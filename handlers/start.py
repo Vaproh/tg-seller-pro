@@ -43,8 +43,9 @@ async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         uptime_str = "unknown"
 
-    msg_time = update.message.date.timestamp()
-    latency_ms = int((now - msg_time) * 1000)
+    t0 = time.monotonic()
+    await context.bot.get_me()
+    latency_ms = int((time.monotonic() - t0) * 1000)
     if latency_ms < 1000:
         latency_str = f"{latency_ms}ms"
     else:
