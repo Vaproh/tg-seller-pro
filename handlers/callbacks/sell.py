@@ -283,72 +283,28 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
                 payment_status=payment_status,
             )
             status_label = "pending payment" if payment_status == "pending" else "sold"
-            sold_accounts = []
-            for sid in selected:
-                acc = get_account_by_id(sid)
-                if acc:
-                    sold_accounts.append(_d(acc))
-
             chat_id = update.effective_chat.id
 
-            if sold_accounts:
-                blocks = []
-                for a in sold_accounts:
-                    block = (
-                        f"╭─ #{code_id(a.get('id', ''))} ─────────\n"
-                        f"│ 👤 {code(a.get('username', ''))}\n"
-                        f"│ 🔑 {spoiler(a.get('password', ''))}\n"
-                    )
-                    if a.get("email"):
-                        block += f"│ 📧 {code(a['email'])}\n"
-                    if a.get("email_password"):
-                        block += f"│ 🔑 Email Pass: {spoiler(a['email_password'])}\n"
-                    block += (
-                        f"│ 🔗 {code(reddit_url(a.get('username', '')))}\n"
-                        f"╰──────────────────\n"
-                    )
-                    blocks.append(block)
-
-                header = f"✅ <b>Bulk {status_label}: {len(sold_accounts)} accounts</b>\n\n"
-                footer = f"\n💰 {config.CURRENCY}{price:.0f} each"
-
-                msg_text = header
-                for block in blocks:
-                    if len(msg_text) + len(block) + len(footer) > 3900:
-                        try:
-                            await context.bot.send_message(chat_id=chat_id, text=_truncate(msg_text), parse_mode="HTML")
-                        except BadRequest as e:
-                            logger.error("Failed to send bulk creds: %s", e)
-                            try:
-                                await context.bot.send_message(chat_id=chat_id, text=msg_text)
-                            except Exception:
-                                pass
-                        msg_text = block
-                    else:
-                        msg_text += block
-                msg_text += footer
+            for sale_code in result.get("sale_codes", []):
+                sale = get_sale_by_id(sale_code)
+                if not sale:
+                    continue
+                receipt = fmt_receipt(sale)
                 try:
-                    await context.bot.send_message(chat_id=chat_id, text=_truncate(msg_text), parse_mode="HTML")
+                    await context.bot.send_message(chat_id=chat_id, text=receipt, parse_mode="HTML")
                 except BadRequest as e:
-                    logger.error("Failed to send bulk creds: %s", e)
+                    logger.error("Failed to send receipt: %s", e)
                     try:
-                        await context.bot.send_message(chat_id=chat_id, text=msg_text)
+                        await context.bot.send_message(chat_id=chat_id, text=receipt)
                     except Exception:
                         pass
 
-                try:
-                    await query.edit_message_text(
-                        f"✅ Bulk {status_label}: {len(sold_accounts)} accounts — {config.CURRENCY}{price:.0f} each"
-                    )
-                except BadRequest:
-                    pass
-            else:
-                try:
-                    await query.edit_message_text(
-                        f"✅ Bulk {status_label}: {result['added']} accounts, {result['skipped']} skipped"
-                    )
-                except BadRequest:
-                    pass
+            try:
+                await query.edit_message_text(
+                    f"✅ Bulk {status_label}: {result['added']} accounts — {config.CURRENCY}{price:.0f} each"
+                )
+            except BadRequest:
+                pass
             await notify_admin(context, f"💰 Bulk sell: {result['added']} accounts — {config.CURRENCY}{price:.0f} each ({status_label}) — by {esc(seller['name'])}")
         return True
 

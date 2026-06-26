@@ -48,6 +48,7 @@ def sell_account(account_id, seller_id, price, payment_status="pending", notes=N
 def bulk_sell_accounts(ids, seller_id, price_each, payment_status="pending", notes=None):
     added = 0
     skipped = 0
+    sale_codes = []
     conn = connect()
     try:
         for aid in ids:
@@ -67,11 +68,12 @@ def bulk_sell_accounts(ids, seller_id, price_each, payment_status="pending", not
                     "UPDATE accounts SET status = ? WHERE id = ?",
                     (new_status, aid),
                 )
+                sale_codes.append(sale_code)
                 added += 1
             except sqlite3.IntegrityError:
                 skipped += 1
         conn.commit()
-        return {"added": added, "skipped": skipped}
+        return {"added": added, "skipped": skipped, "sale_codes": sale_codes}
     finally:
         conn.close()
 
