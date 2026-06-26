@@ -1,4 +1,4 @@
-from telegram import Update, InputFile
+from telegram import Update
 from telegram.ext import ContextTypes
 from core.permissions import require_seller, get_user_role
 from core.state import state

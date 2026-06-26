@@ -5,8 +5,6 @@ from core.state import state
 from core.format import esc, code, code_id, fmt_sale_block, _d, _truncate
 from core.keyboards import confirm_keyboard, sell_select_keyboard, category_keyboard
 from core.filters import (
-    apply_list_filters,
-    fmt_account_list_line,
     sale_actions_keyboard,
     PAGE_SIZE,
 )

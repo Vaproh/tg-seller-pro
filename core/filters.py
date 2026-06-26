@@ -1,6 +1,6 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from core.format import esc, _d, reddit_url, code_id, code_username
-from database import list_accounts, count_accounts, list_categories, get_category_name
+from core.format import esc, _d, code_id, code_username
+from database import list_accounts, count_accounts
 import config
 
 
@@ -83,29 +83,6 @@ def fmt_account_list_page(accounts, page, total_pages, title="Accounts"):
     return text
 
 
-def filter_keyboard(prefix, include_available=True, include_sold=True,
-                    include_pending=False, include_all=True, include_ids=False):
-    buttons = []
-    row = []
-    if include_all:
-        row.append(InlineKeyboardButton("📋 All", callback_data=f"{prefix}:all"))
-    if include_available:
-        row.append(InlineKeyboardButton("🟢 Available", callback_data=f"{prefix}:available"))
-    if include_sold:
-        row.append(InlineKeyboardButton("🔴 Sold", callback_data=f"{prefix}:sold"))
-    if include_pending:
-        row.append(InlineKeyboardButton("🟡 Pending", callback_data=f"{prefix}:pending"))
-    if row:
-        buttons.append(row)
-    cat_row = [
-        InlineKeyboardButton("📂 Category", callback_data=f"{prefix}cat"),
-    ]
-    if include_ids:
-        cat_row.append(InlineKeyboardButton("🔢 By ID", callback_data=f"{prefix}ids"))
-    buttons.append(cat_row)
-    return InlineKeyboardMarkup(buttons)
-
-
 def pagination_row(prefix, page, total_pages):
     row = []
     if page > 1:
@@ -136,23 +113,6 @@ def filter_page_keyboard(prefix, page, total_pages, **filter_kwargs):
     return InlineKeyboardMarkup([filter_row_buttons, cat_row, nav_row])
 
 
-def category_keyboard_with_all(callback_prefix):
-    cats = list_categories()
-    buttons = []
-    row = [InlineKeyboardButton("📋 All", callback_data=f"{callback_prefix}:all")]
-    buttons.append(row)
-    row = []
-    for cat in cats:
-        label = f"{cat['name']} ({cat['account_count']})"
-        row.append(InlineKeyboardButton(label, callback_data=f"{callback_prefix}:{cat['id']}"))
-        if len(row) == 2:
-            buttons.append(row)
-            row = []
-    if row:
-        buttons.append(row)
-    return InlineKeyboardMarkup(buttons) if buttons else None
-
-
 def payment_status_keyboard(prefix="paystatus"):
     return InlineKeyboardMarkup([
         [
@@ -177,13 +137,4 @@ def sale_actions_keyboard(sale_id):
     ])
 
 
-def mark_status_keyboard(callback_prefix):
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("🟢 Available", callback_data=f"{callback_prefix}:available"),
-            InlineKeyboardButton("🔴 Sold", callback_data=f"{callback_prefix}:sold"),
-        ],
-        [
-            InlineKeyboardButton("🟡 Pending Payment", callback_data=f"{callback_prefix}:pending_payment"),
-        ],
-    ])
+

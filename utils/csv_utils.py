@@ -46,21 +46,3 @@ def _parse_bool(val):
     if not val:
         return False
     return val.strip().lower() in ("true", "1", "yes")
-
-
-def export_with_sales_csv(sales_data):
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow([
-        "sale_id", "account_id", "username", "password",
-        "price", "payment_status", "tags",
-        "seller", "category", "sold_at"
-    ])
-    for s in sales_data:
-        writer.writerow([
-            s["id"], s["account_id"], s["username"], s["password"],
-            s["price"], s["payment_status"],
-            s.get("tags", ""), s.get("seller_name", ""),
-            s.get("category_name", ""), s["sold_at"],
-        ])
-    return output.getvalue().encode("utf-8")

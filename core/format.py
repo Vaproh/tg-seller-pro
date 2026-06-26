@@ -30,10 +30,6 @@ def code_username(value):
     return code(value)
 
 
-def code_email(value):
-    return code(value)
-
-
 def _truncate(text, limit=MAX_MSG_LEN):
     if len(text) <= limit:
         return text

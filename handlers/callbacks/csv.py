@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 from core.permissions import require_admin
 from core.state import state
 from core.format import esc, code, spoiler, _truncate
-from core.keyboards import confirm_keyboard, category_keyboard
+from core.keyboards import confirm_keyboard
 from database import get_category_name, add_accounts_bulk
 from utils.csv_utils import build_accounts_from_csv
 from utils.notifications import notify_admin

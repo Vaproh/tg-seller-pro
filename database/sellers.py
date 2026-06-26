@@ -63,14 +63,3 @@ def get_seller_by_id(seller_id):
         ).fetchone()
     finally:
         conn.close()
-
-
-def is_seller_active(user_id):
-    conn = connect()
-    try:
-        row = conn.execute(
-            "SELECT active FROM sellers WHERE user_id = ?", (user_id,)
-        ).fetchone()
-        return row is not None and row["active"] == 1
-    finally:
-        conn.close()

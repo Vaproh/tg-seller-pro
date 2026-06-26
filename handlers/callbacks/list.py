@@ -6,10 +6,10 @@ from core.format import esc, _d, _truncate, code_id, code_username
 import config
 from core.keyboards import confirm_keyboard, category_keyboard
 from core.filters import (
-    filter_page_keyboard, apply_list_filters, count_from_filter,
-    fmt_account_list_page, parse_filter_state, build_filter_state,
+    filter_page_keyboard, apply_list_filters,
+    fmt_account_list_page,
     parse_id_list, payment_status_keyboard,
-    fmt_account_list_line, category_keyboard_with_all, PAGE_SIZE,
+    fmt_account_list_line, PAGE_SIZE,
 )
 from database import (
     list_categories, get_category_name, delete_account, delete_category,

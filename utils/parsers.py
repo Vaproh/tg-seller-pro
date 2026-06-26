@@ -36,12 +36,3 @@ def parse_csv_file(file_content):
     return headers, data
 
 
-def search_query_tokenizer(query):
-    tokens = []
-    for part in query.split():
-        if "=" in part:
-            key, val = part.split("=", 1)
-            tokens.append((key.lower(), val))
-        else:
-            tokens.append(("general", part))
-    return tokens

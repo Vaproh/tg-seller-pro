@@ -4,10 +4,10 @@ from core.permissions import require_seller
 from core.format import esc
 from core.state import state
 from core.filters import (
-    filter_page_keyboard, apply_list_filters, count_from_filter,
-    fmt_account_list_page, parse_filter_state, build_filter_state, PAGE_SIZE,
+    filter_page_keyboard, apply_list_filters,
+    PAGE_SIZE,
 )
-from database import list_categories, count_accounts, get_category_name
+from database import list_categories, count_accounts
 from database.sales import get_sales_summary
 import config
 

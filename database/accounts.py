@@ -275,21 +275,6 @@ def delete_accounts_in_category(category_id):
         conn.close()
 
 
-def get_accounts_for_category(category_id, limit=5):
-    conn = connect()
-    try:
-        return conn.execute(
-            """SELECT a.*, c.name as category_name
-               FROM accounts a
-               JOIN categories c ON c.id = a.category_id
-               WHERE a.category_id = ?
-               ORDER BY a.id DESC LIMIT ?""",
-            (category_id, limit),
-        ).fetchall()
-    finally:
-        conn.close()
-
-
 def get_available_accounts_for_category(category_id, limit=5):
     conn = connect()
     try:

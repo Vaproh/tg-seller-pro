@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from core.permissions import require_seller, get_user_role
-from core.keyboards import main_menu_keyboard, add_menu_keyboard, settings_keyboard
+from core.keyboards import main_menu_keyboard
 from core.help_content import HELP_MAIN_ADMIN, HELP_MAIN_SELLER
 import config
 
