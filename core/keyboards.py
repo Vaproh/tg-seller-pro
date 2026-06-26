@@ -3,8 +3,8 @@ from database.categories import list_categories
 from core.format import esc
 
 
-def category_keyboard(callback_prefix, include_all=False):
-    cats = list_categories()
+def category_keyboard(callback_prefix, include_all=False, status=None):
+    cats = list_categories(status=status)
     buttons = []
     row = []
     if include_all:

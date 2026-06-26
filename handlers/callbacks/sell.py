@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from core.permissions import require_seller
 from core.state import state
-from core.format import esc, code, code_id, spoiler, _d, fmt_receipt, _truncate
+from core.format import esc, code, code_id, spoiler, _d, fmt_receipt, _truncate, reddit_url
 from core.keyboards import confirm_keyboard, sell_select_keyboard, category_keyboard
 from core.filters import (
     apply_list_filters,
@@ -94,7 +94,7 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
         if not seller:
             await query.edit_message_text("⚠️ You are not registered as a seller.")
             return True
-        kb = category_keyboard("sellcat", include_all=True)
+        kb = category_keyboard("sellcat", include_all=True, status="available")
         if not kb:
             state.set(user_id, "sell_category", None)
             await query.edit_message_text("💰 Sell accounts:", reply_markup=_mode_keyboard())
@@ -279,9 +279,33 @@ async def try_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: s
                 payment_status=payment_status,
             )
             status_label = "pending payment" if payment_status == "pending" else "sold"
-            await query.edit_message_text(
-                f"✅ Bulk sell complete: {result['added']} {status_label}, {result['skipped']} skipped"
-            )
+            sold_accounts = []
+            for sid in selected:
+                acc = get_account_by_id(sid)
+                if acc:
+                    sold_accounts.append(_d(acc))
+            if sold_accounts:
+                text = f"✅ <b>Bulk {status_label}: {len(sold_accounts)} accounts</b>\n\n"
+                for a in sold_accounts:
+                    text += (
+                        f"╭─ #{code_id(a.get('id', ''))} ─────────\n"
+                        f"│ 👤 {code(a.get('username', ''))}\n"
+                        f"│ 🔑 {spoiler(a.get('password', ''))}\n"
+                    )
+                    if a.get("email"):
+                        text += f"│ 📧 {code(a['email'])}\n"
+                    if a.get("email_password"):
+                        text += f"│ 🔑 Email Pass: {spoiler(a['email_password'])}\n"
+                    text += (
+                        f"│ 🔗 {code(reddit_url(a.get('username', '')))}\n"
+                        f"╰──────────────────\n\n"
+                    )
+                text += f"💰 {config.CURRENCY}{price:.0f} each"
+                await query.edit_message_text(_truncate(text), parse_mode="HTML")
+            else:
+                await query.edit_message_text(
+                    f"✅ Bulk {status_label}: {result['added']} accounts, {result['skipped']} skipped"
+                )
             await notify_admin(context, f"💰 Bulk sell: {result['added']} accounts — {config.CURRENCY}{price:.0f} each ({status_label}) — by {esc(seller['name'])}")
         return True
 

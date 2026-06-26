@@ -58,19 +58,32 @@ def delete_category(name):
         conn.close()
 
 
-def list_categories():
+def list_categories(status=None):
     conn = connect()
     try:
-        rows = conn.execute(
-            """
-            SELECT c.id, c.name, c.default_price,
-                   COUNT(a.id) as account_count
-            FROM categories c
-            LEFT JOIN accounts a ON a.category_id = c.id
-            GROUP BY c.id
-            ORDER BY c.name
-            """
-        ).fetchall()
+        if status:
+            rows = conn.execute(
+                """
+                SELECT c.id, c.name, c.default_price,
+                       COUNT(a.id) as account_count
+                FROM categories c
+                LEFT JOIN accounts a ON a.category_id = c.id AND a.status = ?
+                GROUP BY c.id
+                ORDER BY c.name
+                """,
+                (status,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT c.id, c.name, c.default_price,
+                       COUNT(a.id) as account_count
+                FROM categories c
+                LEFT JOIN accounts a ON a.category_id = c.id
+                GROUP BY c.id
+                ORDER BY c.name
+                """
+            ).fetchall()
         return rows
     finally:
         conn.close()

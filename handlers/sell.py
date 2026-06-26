@@ -29,7 +29,7 @@ async def sell_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ You are not registered as a seller.")
         return
     state.set(user_id, "sell_category", None)
-    kb = category_keyboard("sellcat", include_all=True)
+    kb = category_keyboard("sellcat", include_all=True, status="available")
     if not kb:
         state.set(user_id, "sell_category", None)
         kb2 = InlineKeyboardMarkup([
