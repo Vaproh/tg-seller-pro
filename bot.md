@@ -56,17 +56,16 @@ handlers/               Telegram handlers
     search.py             Search callbacks
     misc.py               Stats, sellers, report, settings, export, backup, help, preview
   messages.py             Free-text input + CSV upload
-  sell.py                 /sell, /bulksell, /sales, /sale, /markpaid, /voidsale, /marksold, /markunsold, /markpendingpayment
+  sell.py                 /sell, /sales, /sale, /markpaid, /voidsale, /marksold, /markunsold, /markpendingpayment
   accounts.py             /add, /bulkadd, /getid, /delete, /bulkdelete, /extractcsv, /list
   search.py               /search with multi-filters
   preview.py              /preview (pull accounts for buyer)
   categories.py           /categories, /addcategory, /deletecategory
   inventory.py            /inventory
-  buyers.py               /buyers, /buyer
   reports.py              /report
   sellers.py              /addseller, /removeseller, /listsellers
   export.py               /export, /backup
-  start.py                /start, /mainmenu, /ping
+  start.py                /start, /ping
   help.py                 /help with topic keyboard
   errors.py               error_handler
 
@@ -197,7 +196,7 @@ Default row: `('uncategorized', 0)` — cannot be deleted.
 | `/add`, `/bulkadd`, `/extractcsv` | ✅ | ❌ |
 | `/delete`, `/bulkdelete` | ✅ | ❌ |
 | `/list`, `/search`, `/getid` | ✅ | ✅ |
-| `/sell`, `/bulksell` | ✅ | ✅ |
+| `/sell` | ✅ | ✅ |
 | `/sales` | ✅ all | ✅ own |
 | `/sale` | ✅ | ✅ |
 | `/markpaid` | ✅ | ✅ own |
@@ -207,7 +206,6 @@ Default row: `('uncategorized', 0)` — cannot be deleted.
 | `/categories` | ✅ | ✅ |
 | `/addcategory`, `/deletecategory` | ✅ | ❌ |
 | `/inventory` | ✅ | ✅ |
-| `/buyers`, `/buyer` | ✅ all | ✅ own |
 | `/report` | ✅ | ❌ |
 | `/addseller`, `/removeseller`, `/listsellers` | ✅ | ❌ |
 | `/export`, `/backup` | ✅ | ❌ |
@@ -244,17 +242,12 @@ Username → Password → Email → Email Pass → 2FA → Verified → Notes �
 
 ### Selling (Admin + Seller)
 
-**`/sell`** — Sell one account:
-1. Shows 🟢 available accounts (filtered)
-2. Pick buyer (from previous buyers list or type new)
+**`/sell`** — Sell one or more accounts:
+1. Choose category (🟢 available only)
+2. Pick mode: Select (tap to toggle) or Enter count
 3. Enter price (required)
 4. Choose 🟢 Sold or 🟡 Pending Payment
 5. Confirm → receipt sent
-
-**`/bulksell`** — Choose mode:
-- **Select:** tap accounts to toggle, then Done
-- **Number:** enter count, auto-picks available
-- Then: buyer → price → status → confirm
 
 **`/sales`** — View sales with filters (🟡 Pending / ✅ Paid / 📋 All)
 - 5 per page, admin sees all, seller sees own
@@ -285,9 +278,6 @@ Username → Password → Email → Email Pass → 2FA → Verified → Notes �
 **`/deletecategory <name>`** — Delete (accounts move to uncategorized)
 
 **`/inventory`** — Overview: 🟢 available / 🔴 sold / 🟡 pending per category + total revenue
-
-**`/buyers`** — List all buyers with total spent
-**`/buyer <name>`** — Purchase history for one buyer
 
 **`/report`** — Pick period → revenue, sales count, pending, per-seller, per-category
 
@@ -337,7 +327,7 @@ On confirm:
 
 ## Filtering System
 
-Shared across `/list`, `/sell`, `/bulksell`, `/delete`, `/inventory`.
+Shared across `/list`, `/sell`, `/delete`, `/inventory`.
 
 **Filter buttons:**
 - 📋 All — show everything

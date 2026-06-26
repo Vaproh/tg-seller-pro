@@ -96,8 +96,7 @@ docker compose down
 ### Selling
 | Command | Description |
 |---------|-------------|
-| `/sell` | Sell one account (available only) |
-| `/bulksell` | Bulk sell (tap to select multiple accounts) |
+| `/sell` | Sell one or more accounts |
 | `/sales` | View all sales |
 | `/sale <id>` | View sale detail |
 | `/markpaid` | Mark pending sale as paid |
@@ -119,8 +118,6 @@ docker compose down
 | `/addcategory <name>` | Create category |
 | `/deletecategory <name>` | Delete category |
 | `/inventory` | Stock overview |
-| `/buyers` | List all buyers |
-| `/buyer <name>` | Buyer purchase history |
 | `/report` | Revenue reports |
 | `/addseller <id> <name>` | Register seller (admin) |
 | `/removeseller <id>` | Remove seller (admin) |

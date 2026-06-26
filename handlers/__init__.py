@@ -3,7 +3,7 @@ from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler,
     MessageHandler, filters,
 )
-from handlers.start import start, mainmenu, ping
+from handlers.start import start, ping
 from handlers.accounts import (
     add_cmd, add_bulk_cmd, getid_cmd, delete_cmd,
     bulkdelete_cmd, extractcsv_cmd, list_cmd,
@@ -36,7 +36,6 @@ logger = logging.getLogger(__name__)
 
 def register_handlers(application: Application):
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("mainmenu", mainmenu))
     application.add_handler(CommandHandler("ping", ping))
     application.add_handler(CommandHandler("help", help_command))
 

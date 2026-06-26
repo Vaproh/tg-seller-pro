@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import signal
 import logging
 from logging.handlers import RotatingFileHandler
@@ -50,12 +51,12 @@ def shutdown(signum, frame):
 async def post_init(application):
     from utils.scheduler import setup_scheduler
     setup_scheduler(application)
+    application.bot_data["start_time"] = time.time()
     logger.info("Scheduler started.")
 
     commands = [
         BotCommand("start", "🚀 Start the bot"),
         BotCommand("help", "📖 Show help"),
-        BotCommand("mainmenu", "📋 Main menu"),
         BotCommand("ping", "🏓 Health check"),
         BotCommand("add", "➕ Add single account (admin)"),
         BotCommand("bulkadd", "📥 Bulk import (admin)"),
