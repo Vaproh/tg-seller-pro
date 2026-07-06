@@ -1,26 +1,29 @@
-# Reddit Account Selling Bot
+# 🤖 TG Seller Bot
 
 A Telegram bot for managing and selling Reddit accounts. Built with python-telegram-bot v21+, SQLite, and APScheduler.
 
-## Features
+## ✨ Features
 
-- **Account Management** — Add single, bulk, or CSV import
-- **Selling** — Sell individually or in bulk with buyer tracking
-- **Payment Tracking** — Pending/paid status with 4-hour reminders
-- **Inventory** — Real-time stock overview by category and status
-- **Search** — Multi-filter search by username, category, status, buyer, etc.
-- **Reports** — Daily, weekly, and custom period revenue reports
-- **Multi-seller** — Admin + seller roles with permission controls
-- **Scheduled Reports** — Auto daily/weekly reports + pending payment alerts
+- 📦 **Account Management** — Add single, bulk, or CSV import
+- 💰 **Selling** — Sell individually or in bulk with receipt generation
+- 💳 **Payment Tracking** — Pending/paid status with 4-hour reminders
+- 📊 **Inventory** — Real-time stock overview by category and status
+- 🔎 **Search** — Multi-filter search by username, category, status
+- 📈 **Reports** — Daily, weekly, and custom period revenue reports with charts
+- 👥 **Multi-seller** — Admin + seller roles with permission controls
+- ⏰ **Scheduled Reports** — Auto daily/weekly reports + pending payment alerts
+- 📋 **Activity Logs** — Track all command usage across sellers
+- 💸 **Dues Management** — Track and manage seller dues
+- 🔄 **Bulk Operations** — Transfer sales, bulk delete, bulk sell
 
-## Quick Start
+## 🚀 Quick Start
 
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/Vaproh/manager-telegram-bot.git
-cd manager-telegram-bot
-pip install -r requirements.txt
+git clone https://github.com/Vaproh/tg-seller-pro.git
+cd tg-seller-pro
+uv sync
 ```
 
 ### 2. Create `.env`
@@ -41,10 +44,10 @@ TIMEZONE=Asia/Kolkata
 ### 3. Run
 
 ```bash
-python main.py
+uv run main.py
 ```
 
-## Docker Deployment
+## 🐳 Docker Deployment
 
 ### Using deploy script (recommended)
 
@@ -58,7 +61,6 @@ python main.py
 ./deploy.sh start      # Start bot
 ./deploy.sh logs       # View logs
 ./deploy.sh status     # Container status
-./deploy.sh test       # Run test suite
 ./deploy.sh rebuild    # Full rebuild from scratch
 ```
 
@@ -75,9 +77,9 @@ docker compose logs -f
 docker compose down
 ```
 
-## Commands
+## 📝 Commands
 
-### Account Management
+### 📦 Account Management
 | Command | Description |
 |---------|-------------|
 | `/add` | Add single account (step-by-step wizard) |
@@ -85,48 +87,67 @@ docker compose down
 | `/extractcsv` | Import from CSV file |
 | `/delete` | Delete account (by ID or filter) |
 | `/bulkdelete` | Bulk delete by IDs or category |
+| `/getid <id>` | View account details |
 
-### Browsing
+### 🔍 Browsing
 | Command | Description |
 |---------|-------------|
 | `/list` | Browse accounts with filters |
 | `/search` | Search with multi-filters |
-| `/getid <id>` | View account details |
+| `/inventory` | Stock overview |
+| `/preview` | Show accounts to buyer |
 
-### Selling
+### 💰 Selling
 | Command | Description |
 |---------|-------------|
 | `/sell` | Sell one or more accounts |
+| `/sample` | Generate account previews for buyers |
 | `/sales` | View all sales |
 | `/sale <id>` | View sale detail |
 | `/markpaid` | Mark pending sale as paid |
 | `/voidsale` | Cancel a sale (admin) |
+| `/editsale` | Edit sale details |
 
-### Status Management
+### 🔴 Status Management
 | Command | Description |
 |---------|-------------|
 | `/marksold <id,id,...>` | Mark account(s) as sold |
 | `/markunsold <id,id,...>` | Mark account(s) as available |
 | `/markpendingpayment <id,id,...>` | Mark as pending payment |
-| `/editsale` | Edit sale details (buyer, price, status, notes) |
 
-### Other
+### 📂 Categories
 | Command | Description |
 |---------|-------------|
-| `/preview` | Show accounts to buyer |
 | `/categories` | List all categories |
 | `/addcategory <name>` | Create category |
 | `/deletecategory <name>` | Delete category |
-| `/inventory` | Stock overview |
-| `/report` | Revenue reports |
+
+### 👥 Team
+| Command | Description |
+|---------|-------------|
 | `/addseller <id> <name>` | Register seller (admin) |
 | `/removeseller <id>` | Remove seller (admin) |
 | `/listsellers` | List all sellers |
-| `/export` | Download CSV (admin) |
-| `/backup` | Download database (admin) |
+| `/transfersales` | Transfer sales between sellers (admin) |
+
+### 💸 Dues
+| Command | Description |
+|---------|-------------|
+| `/dues` | View dues balance |
+| `/duesadd` | Add due amount |
+| `/duesremove` | Remove due amount |
+
+### 🛠️ Admin
+| Command | Description |
+|---------|-------------|
+| `/export` | Download CSV |
+| `/backup` | Download database |
+| `/report` | Revenue reports |
+| `/stats` | Revenue stats with charts |
+| `/logs` | View command activity |
 | `/help` | Help with inline topic browser |
 
-## Account Statuses
+## 📊 Account Statuses
 
 | Status | Meaning |
 |--------|---------|
@@ -134,78 +155,72 @@ docker compose down
 | 🔴 `sold` | Already sold |
 | 🟡 `pending_payment` | Sold, waiting for payment |
 
-## Configuration
+## ⚙️ Configuration
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `BOT_TOKEN` | Yes | — | Telegram bot token |
-| `ADMIN_USER_ID` | Yes | — | Admin Telegram ID |
-| `DAILY_REPORT_HOUR` | No | `9` | Hour for daily report |
-| `WEEKLY_REPORT_DAY` | No | `monday` | Day for weekly report |
-| `TIMEZONE` | No | `Asia/Kolkata` | Timezone |
+| `BOT_TOKEN` | ✅ | — | Telegram bot token |
+| `ADMIN_USER_ID` | ✅ | — | Admin Telegram ID |
+| `DAILY_REPORT_HOUR` | ❌ | `9` | Hour for daily report |
+| `WEEKLY_REPORT_DAY` | ❌ | `monday` | Day for weekly report |
+| `TIMEZONE` | ❌ | `Asia/Kolkata` | Timezone |
 
-## Project Structure
-
-```
-├── main.py                 # Entry point
-├── config.py               # Environment config
-├── requirements.txt        # Dependencies (incl. pytest)
-├── .env.example            # Env template
-├── Dockerfile              # Docker build (Python 3.12-slim)
-├── docker-compose.yml      # Container config + volume mounts
-├── .dockerignore           # Docker build exclusions
-├── deploy.sh               # Deploy script (deploy/restart/stop/test/logs)
-├── bot.md                  # Full documentation
-├── database/               # SQLite database layer
-│   ├── connection.py       # DB connection + migrations (WAL mode)
-│   ├── categories.py       # Category CRUD
-│   ├── accounts.py         # Account CRUD + search
-│   ├── sales.py            # Sale CRUD + revenue
-│   ├── sellers.py          # Seller CRUD
-│   └── sessions.py         # Legacy retrieval sessions
-├── handlers/               # Telegram command handlers
-│   ├── callbacks/          # Button handlers (split by domain)
-│   │   ├── __init__.py     # Chain dispatch
-│   │   ├── menu.py, add.py, sell.py, list.py
-│   │   ├── sales.py, csv.py, search.py, misc.py
-│   ├── messages.py         # Free-text input handlers
-│   ├── sell.py             # Sell flow
-│   ├── accounts.py         # Add/delete/list
-│   ├── search.py           # Search flow
-│   ├── help.py             # Help system
-│   └── ...
-├── core/                   # Shared utilities
-│   ├── filters.py          # Reusable filter system
-│   ├── format.py           # Text formatting (_truncate, esc, etc.)
-│   ├── keyboards.py        # Inline keyboards
-│   ├── permissions.py      # Role checks
-│   ├── state.py            # State manager (TTL)
-│   └── help_content.py     # Help text
-├── utils/                  # Utilities
-│   ├── scheduler.py        # APScheduler jobs
-│   ├── notifications.py    # Admin notifications
-│   ├── csv_utils.py        # CSV import/export
-│   └── parsers.py          # Input parsers
-└── tests/                  # pytest test suite (116 tests)
-    ├── conftest.py         # Test fixtures
-    └── test_*.py           # 10 test modules
-```
-
-## License
-
-Private use only.
-
-## Testing
+## 🧪 Testing
 
 ```bash
 # Run all tests
-pytest tests/ -v
+uv run pytest tests/ -v
 
 # Run specific test file
-pytest tests/test_database.py -v
-
-# Run with deploy script
-./deploy.sh test
+uv run pytest tests/test_database.py -v
 ```
 
-116 tests covering database operations, sell flow, filters, formatting, state management, and more.
+## 📁 Project Structure
+
+```
+├── main.py                 # 🚀 Entry point
+├── config.py               # ⚙️ Environment config
+├── pyproject.toml          # 📦 Dependencies (uv)
+├── justfile                # 🔧 Task runner
+├── .env.example            # 📝 Env template
+├── Dockerfile              # 🐳 Docker build
+├── docker-compose.yml      # 🐳 Container config
+├── deploy.sh               # 🚀 Deploy script
+├── bot.md                  # 📖 Full documentation
+├── database/               # 💾 SQLite database layer
+│   ├── connection.py       #    DB connection + migrations
+│   ├── categories.py       #    Category CRUD
+│   ├── accounts.py         #    Account CRUD + search
+│   ├── sales.py            #    Sale CRUD + revenue
+│   ├── sellers.py          #    Seller CRUD
+│   ├── dues.py             #    Dues tracking
+│   ├── logs.py             #    Command activity logs
+│   └── sessions.py         #    Legacy retrieval sessions
+├── handlers/               # 🤖 Telegram command handlers
+│   ├── callbacks/          #    Button handlers
+│   ├── messages.py         #    Free-text input
+│   ├── sell.py             #    Sell flow
+│   ├── accounts.py         #    Add/delete/list
+│   ├── logs.py             #    Activity logs
+│   ├── dues.py             #    Dues management
+│   └── ...
+├── core/                   # 🔧 Shared utilities
+│   ├── filters.py          #    Filter system
+│   ├── format.py           #    Text formatting
+│   ├── keyboards.py        #    Inline keyboards
+│   ├── permissions.py      #    Role checks
+│   ├── state.py            #    State manager
+│   └── help_content.py     #    Help text
+├── utils/                  # 🛠️ Utilities
+│   ├── scheduler.py        #    APScheduler jobs
+│   ├── notifications.py    #    Admin notifications
+│   ├── csv_utils.py        #    CSV import/export
+│   └── parsers.py          #    Input parsers
+└── tests/                  # 🧪 pytest test suite
+    ├── conftest.py         #    Test fixtures
+    └── test_*.py           #    Test modules
+```
+
+## 📄 License
+
+Private use only.

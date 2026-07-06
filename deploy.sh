@@ -94,7 +94,9 @@ case "$action" in
 
     test)
         log "Running tests..."
-        if [ -d ".venv" ]; then
+        if command -v uv &>/dev/null; then
+            uv run pytest tests/ -v
+        elif [ -d ".venv" ]; then
             .venv/bin/python -m pytest tests/ -v
         else
             python3 -m pytest tests/ -v

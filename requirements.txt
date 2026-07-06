@@ -1,5 +1,0 @@
-python-telegram-bot>=21.0
-python-dotenv>=1.0.1
-apscheduler>=3.10.0
-pytest>=8.0.0
-matplotlib>=3.7.0
