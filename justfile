@@ -8,17 +8,9 @@ default:
 run:
     uv run main.py
 
-# Run the bot in dev mode (with debug logging)
-dev:
-    uv run python -c "import logging; logging.basicConfig(level=logging.DEBUG); exec(open('main.py').read())"
-
 # Run tests
 test:
     uv run pytest tests/ -v
-
-# Run tests with coverage
-test-cov:
-    uv run pytest tests/ -v --tb=short
 
 # Install/update dependencies
 install:
@@ -53,7 +45,7 @@ clean:
     rm -rf logs/*.log
     echo "✨ Cleaned"
 
-# Deep clean (remove everything including DB backups and env)
+# Deep clean (remove everything including DB and env)
 clean-all: clean
     rm -rf data/
     rm -rf logs/
@@ -62,30 +54,6 @@ clean-all: clean
 
 # Format + lint + test (full check)
 check: fmt lint test
-
-# Docker: deploy (pull + build + restart)
-deploy:
-    ./deploy.sh deploy
-
-# Docker: restart
-docker-restart:
-    ./deploy.sh restart
-
-# Docker: stop
-docker-stop:
-    ./deploy.sh stop
-
-# Docker: start
-docker-start:
-    ./deploy.sh start
-
-# Docker: tail logs
-docker-logs:
-    ./deploy.sh logs
-
-# Docker: full rebuild
-docker-rebuild:
-    ./deploy.sh rebuild
 
 # Backup database
 backup:

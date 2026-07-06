@@ -18,63 +18,16 @@ A Telegram bot for managing and selling Reddit accounts. Built with python-teleg
 
 ## 🚀 Quick Start
 
-### 1. Clone and install
-
 ```bash
 git clone https://github.com/Vaproh/tg-seller-pro.git
 cd tg-seller-pro
-uv sync
+./install.sh
 ```
 
-### 2. Create `.env`
-
-```env
-BOT_TOKEN=your_bot_token_from_botfather
-ADMIN_USER_ID=your_telegram_user_id
-```
-
-Optional:
-```env
-DAILY_REPORT_HOUR=9
-DAILY_REPORT_MINUTE=0
-WEEKLY_REPORT_DAY=monday
-TIMEZONE=Asia/Kolkata
-```
-
-### 3. Run
+Then edit `.env` with your `BOT_TOKEN` and `ADMIN_USER_ID`.
 
 ```bash
 uv run main.py
-```
-
-## 🐳 Docker Deployment
-
-### Using deploy script (recommended)
-
-```bash
-# Deploy (pull + build + start)
-./deploy.sh deploy
-
-# Other commands
-./deploy.sh restart    # Restart bot
-./deploy.sh stop       # Stop bot
-./deploy.sh start      # Start bot
-./deploy.sh logs       # View logs
-./deploy.sh status     # Container status
-./deploy.sh rebuild    # Full rebuild from scratch
-```
-
-### Manual Docker
-
-```bash
-# Build and start
-docker compose up -d --build
-
-# View logs
-docker compose logs -f
-
-# Stop
-docker compose down
 ```
 
 ## 📝 Commands
@@ -168,11 +121,7 @@ docker compose down
 ## 🧪 Testing
 
 ```bash
-# Run all tests
 uv run pytest tests/ -v
-
-# Run specific test file
-uv run pytest tests/test_database.py -v
 ```
 
 ## 📁 Project Structure
@@ -180,12 +129,10 @@ uv run pytest tests/test_database.py -v
 ```
 ├── main.py                 # 🚀 Entry point
 ├── config.py               # ⚙️ Environment config
+├── install.sh              # 📥 Install script
 ├── pyproject.toml          # 📦 Dependencies (uv)
 ├── justfile                # 🔧 Task runner
 ├── .env.example            # 📝 Env template
-├── Dockerfile              # 🐳 Docker build
-├── docker-compose.yml      # 🐳 Container config
-├── deploy.sh               # 🚀 Deploy script
 ├── bot.md                  # 📖 Full documentation
 ├── database/               # 💾 SQLite database layer
 │   ├── connection.py       #    DB connection + migrations
